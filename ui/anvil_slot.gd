@@ -1,9 +1,11 @@
 extends PanelContainer
 
 ## Yunque del panel del herrero: el lugar donde se pone el item a trabajar
-## (inventory_data.anvil). Clic con un arma, escudo o ballesta agarrado: lo
-## pone (y queda agarrado lo que habia). Clic sin nada: lo agarra.
+## (inventory_data.anvil). Clic con un arma, escudo o ballesta agarrado (o
+## soltarlo encima al arrastrar): lo pone (y queda agarrado lo que habia).
+## Clic sin nada: lo agarra.
 
+const ItemDrag := preload("res://inventory/item_drag.gd")
 const CELL: int = 40
 const CELLS := Vector2i(3, 4)
 const FIT_COLOR := Color(0.35, 0.85, 0.35, 0.22)
@@ -19,6 +21,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(CELLS * CELL)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	add_to_group("item_drop_targets")
 
 	var holder := Control.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -67,9 +70,14 @@ func update() -> void:
 	queue_redraw()
 
 
+func _process(_delta: float) -> void:
+	if inventory_data.held != null and is_visible_in_tree():
+		queue_redraw()
+
+
 func _draw() -> void:
 	var held: Slotdata = inventory_data.held
-	if not _hover or held == null:
+	if held == null or not (_hover or get_global_rect().has_point(get_global_mouse_position())):
 		return
 	var color: Color = FIT_COLOR if held.item_data.is_equipment() else BLOCKED_COLOR
 	var rect := Rect2(Vector2(4, 4), size - Vector2(8, 8))
@@ -84,13 +92,28 @@ func _make_custom_tooltip(_for_text: String) -> Object:
 
 
 func _gui_input(event: InputEvent) -> void:
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event == null or not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseMotion:
+		ItemDrag.motion(event.global_position)
 		return
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event == null or mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if not mouse_event.pressed:
+		if ItemDrag.release(self, mouse_event.global_position):
+			accept_event()
+		return
+	var picking: bool = inventory_data.held == null and inventory_data.anvil != null
+	accept_drop()
+	if picking:
+		ItemDrag.begin(mouse_event.global_position)
+	accept_event()
+
+
+## Clic en el yunque o fin de un arrastre encima: pone o agarra.
+func accept_drop(_position: Vector2 = Vector2.ZERO) -> void:
 	var moving: Slotdata = inventory_data.held if inventory_data.held else inventory_data.anvil
 	if inventory_data.on_anvil_clicked():
 		if moving:
 			sfx.play_item(moving.item_data)
 	elif inventory_data.held:
 		sfx.play("stuck", -6.0)
-	accept_event()

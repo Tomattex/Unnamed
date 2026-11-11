@@ -16,6 +16,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	add_to_group("pause_panels")
+	# Soltar ahi un item arrastrado (fuera de un lugar) lo devuelve, no lo tira.
+	add_to_group("item_windows")
 	set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	offset_left = 20.0
 	offset_right = 360.0

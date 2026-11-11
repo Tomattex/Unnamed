@@ -264,7 +264,7 @@ func is_consumable() -> bool:
 	return item_type == ItemType.POTION or item_type == ItemType.SCROLL
 
 
-## Runas: se leen con doble clic y enseñan o suben una habilidad.
+## Runas: se leen con clic derecho (o doble clic) y enseñan o suben una habilidad.
 func is_rune() -> bool:
 	return item_type == ItemType.RUNE and not rune_skill.is_empty()
 

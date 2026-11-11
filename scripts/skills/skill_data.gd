@@ -21,8 +21,8 @@ enum Kind {
 @export_multiline var description: String = ""
 @export var icon: Texture2D
 @export var kind: Kind = Kind.STRIKE
-## Ya no se usa para aprenderla (eso es con runas): sirve para ordenar las
-## habilidades de la clase y para las partidas de antes de las runas.
+## Ya no se usa para aprenderla (ver skill_book.LEARN_LEVELS y las runas):
+## sirve para las partidas de antes de las runas.
 @export var unlock_level: int = 1
 ## Segundos de recarga con Concentracion 0.
 @export var base_cooldown: float = 5.0
@@ -121,10 +121,6 @@ func get_tooltip(level: int = 0) -> String:
 	var shown: int = maxi(level, 1)
 	for row in compare_lines(shown, shown + 1 if level > 0 else shown):
 		lines.append(row)
-	if level <= 0:
-		lines.append("Se aprende leyendo su runa")
-	else:
-		lines.append("Una runa más la sube al nivel %d" % (level + 1))
 	return "\n".join(lines)
 
 

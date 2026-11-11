@@ -2,10 +2,12 @@ extends Node
 
 ## Autoload con las habilidades del jugador: cuales tiene aprendidas, a que
 ## nivel y cuanto le falta a cada una para recargarse.
-## Se aprenden y suben leyendo runas (items con rune_skill, ver Itemdata):
-## la primera habilidad de la clase viene sabida; las demas, con su runa.
-## Ninguna pasa del nivel del personaje. Las runas de otras clases se cambian
-## en el comerciante de runas de la aldea (scripts/npc/rune_merchant.gd).
+## Cada habilidad de la clase se aprende sola al llegar el personaje a su
+## nivel (LEARN_LEVELS, en el orden de la clase) o antes, leyendo su runa
+## (items con rune_skill, ver Itemdata). Las runas tambien la suben de nivel,
+## sin pasar del nivel del personaje. Las runas de otras clases se cambian en
+## el comerciante de runas de la aldea (scripts/npc/rune_merchant.gd). La
+## lista se ve en la pestaña Habilidades del inventario.
 ## La ejecucion de cada habilidad esta en scripts/player/combat.gd.
 
 signal skill_unlocked(index: int)
@@ -20,6 +22,9 @@ const COMBO_MAX_SKILLS: int = 3
 ## La recarga del combo es la suma de las recargas de sus habilidades por este factor.
 const COMBO_COOLDOWN_FACTOR: float = 0.75
 const MAX_SKILL_LEVEL: int = 30
+## Nivel del personaje en el que se aprende sola cada habilidad de la clase
+## (la primera, la segunda...). Con su runa se aprende antes.
+const LEARN_LEVELS := [1, 3, 6, 10, 15]
 
 var skills: Array[SkillData] = []
 ## Nivel de cada habilidad (0 = todavia no se aprendio).
@@ -65,7 +70,12 @@ func reset() -> void:
 func _reset_levels() -> void:
 	levels.clear()
 	for i in skills.size():
-		levels.append(1 if i == 0 else 0)
+		levels.append(1 if learn_level(i) <= 1 else 0)
+
+
+## Nivel del personaje en el que la habilidad se aprende sola.
+func learn_level(index: int) -> int:
+	return LEARN_LEVELS[index] if index >= 0 and index < LEARN_LEVELS.size() else LEARN_LEVELS.back()
 
 
 func _process(delta: float) -> void:
@@ -108,7 +118,37 @@ func get_cooldown_ratio(index: int) -> float:
 
 func get_tooltip(index: int) -> String:
 	var skill: SkillData = get_skill(index)
-	return skill.get_tooltip(get_level(index)) if skill else ""
+	if skill == null:
+		return ""
+	return "%s\n%s" % [skill.get_tooltip(get_level(index)), learn_hint(index)]
+
+
+## Como se aprende o se sube (para los tooltips y la lista de habilidades).
+func learn_hint(index: int) -> String:
+	var level: int = get_level(index)
+	if level <= 0:
+		return "Se aprende sola en el nivel %d, o antes con su runa" % learn_level(index)
+	if level >= MAX_SKILL_LEVEL:
+		return "Está al máximo"
+	return "Su runa la sube al nivel %d (necesitás nivel %d)" % [level + 1, level + 1]
+
+
+## Runas de esa habilidad que hay en la mochila.
+func rune_count(index: int) -> int:
+	if index < 0 or index >= _paths.size():
+		return 0
+	var rune: Itemdata = Runes.rune_for(_paths[index])
+	return inventory_data.count_item(rune) if rune else 0
+
+
+## Lee una runa de esa habilidad que este en la mochila ("" si salio bien).
+func read_rune_for(index: int) -> String:
+	if index < 0 or index >= _paths.size():
+		return "No hay runa"
+	var rune: Itemdata = Runes.rune_for(_paths[index])
+	if rune == null or inventory_data.count_item(rune) <= 0:
+		return "No tenés la runa de %s" % skills[index].name
+	return read_rune(rune)
 
 
 # --- Runas -----------------------------------------------------------------
@@ -158,8 +198,9 @@ func to_save() -> Array[int]:
 	return levels.duplicate()
 
 
-## Niveles de una partida. Las de antes de las runas no los tienen: lo que ya
-## estaba aprendido por nivel queda en nivel 1 (que es como pegaba).
+## Niveles de una partida: lo aprendido conserva su nivel y lo que el
+## personaje ya alcanzo por nivel queda aprendido. Las partidas de antes de
+## las runas no los tienen: lo que estaba aprendido por nivel queda en 1.
 func load_levels(saved: Variant, character_level: int) -> void:
 	_reset_levels()
 	if saved is Array and (saved as Array).size() == skills.size():
@@ -169,8 +210,18 @@ func load_levels(saved: Variant, character_level: int) -> void:
 		for i in skills.size():
 			if skills[i].unlock_level <= character_level:
 				levels[i] = 1
-	levels[0] = maxi(levels[0], 1)
+	_learn_by_level(character_level, false)
 	combo.assign(combo.filter(is_unlocked))
+
+
+# Aprende las que ya corresponden al nivel del personaje. announce: avisa
+# (despues de que se procese la subida de nivel, asi el cartel de nivel sale primero).
+func _learn_by_level(character_level: int, announce: bool) -> void:
+	for i in skills.size():
+		if levels[i] <= 0 and learn_level(i) <= character_level:
+			levels[i] = 1
+			if announce:
+				skill_unlocked.emit.call_deferred(i)
 
 
 # --- Combo ---------------------------------------------------------------
@@ -219,5 +270,6 @@ func combo_has_strike() -> bool:
 
 
 func _on_leveled_up(new_level: int) -> void:
+	_learn_by_level(new_level, true)
 	if new_level == COMBO_UNLOCK_LEVEL:
 		combo_unlocked.emit()

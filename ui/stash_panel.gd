@@ -13,6 +13,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	add_to_group("pause_panels")
+	# Soltar ahi un item arrastrado (fuera de un lugar) lo devuelve, no lo tira.
+	add_to_group("item_windows")
 
 	var margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]:

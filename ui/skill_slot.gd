@@ -2,7 +2,7 @@ extends PanelContainer
 
 ## Casilla de la barra de habilidades: icono, tecla, nivel de la habilidad,
 ## recarga (se oscurece y muestra los segundos) y, si todavia no se aprendio,
-## el aviso de que hace falta su runa.
+## el nivel en el que se aprende sola (con su runa, antes).
 
 signal pressed(index: int)
 
@@ -49,7 +49,7 @@ func setup(slot_index: int) -> void:
 	_cooldown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	_lock_label = _make_label(holder, 13, Color(0.85, 0.75, 0.55))
-	_lock_label.text = "Runa"
+	_lock_label.text = "Nv %d" % skill_book.learn_level(index)
 	_lock_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

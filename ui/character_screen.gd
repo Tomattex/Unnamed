@@ -1,8 +1,14 @@
 extends PanelContainer
 
-## Pantalla de personaje (tecla C): nivel, experiencia, atributos con puntos
-## para repartir, los stats de combate que resultan de ellos y del equipo, y
-## los efectos especiales y sets que estan activos.
+## Pantalla de personaje (tecla C): nivel, experiencia y dos pestañas.
+## Atributos: los puntos para repartir, los stats de combate que resultan de
+## ellos y del equipo, y los efectos especiales y sets que estan activos.
+## Pasivas: las habilidades pasivas (ui/passives_panel.gd).
+
+const PassivesView := preload("res://ui/passives_panel.gd")
+## Ancho de la hoja (las pasivas necesitan un poco mas que los atributos).
+const WIDTH: float = 380.0
+const PENDING_COLOR := Color(0.55, 0.9, 0.45)
 
 const ATTRIBUTES := {
 	"fuerza": ["Fuerza", "+2% de daño por punto."],
@@ -30,6 +36,9 @@ var _plus_buttons: Dictionary = {}
 var _derived_labels: Dictionary = {}
 var _derived_names: Dictionary = {}
 var _effects_label: Label
+var _stats_box: VBoxContainer
+var _passives: Control
+var _tab_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -83,11 +92,54 @@ func _ready() -> void:
 	_effects_label.add_theme_font_size_override("font_size", 13)
 	_effects_label.add_theme_color_override("font_color", Itemdata.SPECIAL_COLOR)
 	derived_grid.add_sibling(_effects_label)
+	_build_tabs()
 	inventory_data.equipment_changed.connect(refresh.unbind(1))
 	player_stats.stats_changed.connect(refresh)
 	player_stats.xp_changed.connect(refresh.unbind(2))
 	player_stats.health_changed.connect(refresh.unbind(2))
+	player_stats.passives_changed.connect(refresh)
 	refresh()
+
+
+# Pestañas debajo de la experiencia: lo de atributos pasa a su propia caja y
+# al lado va la de pasivas.
+func _build_tabs() -> void:
+	custom_minimum_size.x = WIDTH
+	var box: VBoxContainer = xp_bar.get_parent()
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 4)
+	var group := ButtonGroup.new()
+	for i in 2:
+		var button := Button.new()
+		button.toggle_mode = true
+		button.button_group = group
+		button.focus_mode = Control.FOCUS_NONE
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(show_tab.bind(i))
+		tabs.add_child(button)
+		_tab_buttons.append(button)
+	box.add_child(tabs)
+	box.move_child(tabs, xp_bar.get_index() + 1)
+	_stats_box = VBoxContainer.new()
+	_stats_box.add_theme_constant_override("separation", 8)
+	box.add_child(_stats_box)
+	for child in box.get_children().slice(tabs.get_index() + 1):
+		if child != _stats_box:
+			child.reparent(_stats_box)
+	_passives = PassivesView.new()
+	_passives.visible = false
+	box.add_child(_passives)
+	_tab_buttons[0].button_pressed = true
+
+
+## 0 = atributos, 1 = pasivas.
+func show_tab(index: int) -> void:
+	if index == 1 and _passives.custom_minimum_size.y <= 0.0:
+		# Mismo alto que la hoja de atributos, asi la ventana no salta.
+		_passives.custom_minimum_size.y = maxf(_stats_box.size.y, 420.0)
+	_stats_box.visible = index == 0
+	_passives.visible = index == 1
+	_tab_buttons[index].set_pressed_no_signal(true)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -106,8 +158,10 @@ func toggle() -> void:
 		open()
 
 
-func open() -> void:
+func open(tab: int = -1) -> void:
 	visible = true
+	if tab >= 0:
+		show_tab(tab)
 	refresh()
 	sfx.play("page")
 	_update_pause()
@@ -136,6 +190,15 @@ func refresh() -> void:
 
 	var points: int = player_stats.unspent_points
 	points_label.text = "Puntos: %d" % points if points > 0 else ""
+	_tab_buttons[0].text = "Atributos (%d)" % points if points > 0 else "Atributos"
+	var pending: bool = PassivesView.has_pending()
+	_tab_buttons[1].text = "Pasivas (!)" if pending else "Pasivas"
+	for i in 2:
+		var highlight: bool = (points > 0) if i == 0 else pending
+		if highlight:
+			_tab_buttons[i].add_theme_color_override("font_color", PENDING_COLOR)
+		else:
+			_tab_buttons[i].remove_theme_color_override("font_color")
 	for key in ATTRIBUTES:
 		var bonus: int = roundi(player_stats.get_equipment_bonus(key))
 		_value_labels[key].text = str(player_stats.get_attribute(key))

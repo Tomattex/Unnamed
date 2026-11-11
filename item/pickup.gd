@@ -6,7 +6,12 @@ extends Area3D
 ## Capa de fisica de los items en el piso (para que el clic los encuentre
 ## sin chocar con otras areas como las zonas de spawn).
 const PICKUP_LAYER: int = 4
-const SPRITE_PIXEL_SIZE: float = 4.5
+## Lado del dibujo en el piso (lo que mide un icono de 32 px del atlas a
+## 4,5 unidades por pixel). Los dibujos mas grandes (las runas son SVG de 512)
+## se achican a este tamaño.
+const SPRITE_SIZE: float = 144.0
+## Hasta este tamaño los dibujos son pixel art (sin suavizado).
+const PIXEL_ART_MAX: int = 64
 
 @export var item_data: Itemdata
 @export var quantity: int = 1
@@ -75,11 +80,13 @@ func pop_from(start: Vector3) -> void:
 func _setup_sprite() -> void:
 	_sprite = Sprite3D.new()
 	_sprite.texture = item_data.texture
-	_sprite.pixel_size = SPRITE_PIXEL_SIZE
+	var side: int = maxi(item_data.texture.get_width(), item_data.texture.get_height())
+	_sprite.pixel_size = SPRITE_SIZE / maxf(side, 1.0)
 	_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_sprite.shaded = false
 	_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST if side <= PIXEL_ART_MAX \
+			else BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_sprite.position.y = 110.0
 	add_child(_sprite)
 	fallback_mesh.visible = false

@@ -1,10 +1,13 @@
 extends PanelContainer
 
 ## Slot de equipo del inventario (arma, escudo o una parte de la armadura).
-## Clic con un item agarrado: lo equipa y queda agarrado lo que habia. Clic
-## sin nada: agarra lo equipado. Vacio muestra el dibujo de lo que va ahi.
-## Con un item agarrado encima se marca verde si va ahi y rojo si no.
+## Clic con un item agarrado (o soltarlo encima al arrastrar): lo equipa y
+## queda agarrado lo que habia. Clic sin nada: agarra lo equipado (y se puede
+## arrastrar manteniendo el clic). Clic derecho: lo pasa a la mochila. Vacio
+## muestra el dibujo de lo que va ahi. Con un item agarrado encima se marca
+## verde si va ahi y rojo si no.
 
+const ItemDrag := preload("res://inventory/item_drag.gd")
 const CELL: int = 40
 const FIT_COLOR := Color(0.35, 0.85, 0.35, 0.22)
 const BLOCKED_COLOR := Color(0.9, 0.25, 0.2, 0.25)
@@ -28,6 +31,7 @@ func setup(index: int, cells: Vector2, type_name: String, empty_icon: Texture2D)
 	custom_minimum_size = cells * CELL
 	size = custom_minimum_size
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	add_to_group("item_drop_targets")
 
 	var holder := Control.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -84,9 +88,16 @@ func update() -> void:
 	queue_redraw()
 
 
+func _process(_delta: float) -> void:
+	# Al arrastrar manteniendo el clic no llegan mouse_entered/exited: el
+	# marco se decide por la posicion del mouse.
+	if inventory_data.held != null and is_visible_in_tree():
+		queue_redraw()
+
+
 func _draw() -> void:
 	var held: Slotdata = inventory_data.held
-	if not _hover or held == null:
+	if held == null or not (_hover or get_global_rect().has_point(get_global_mouse_position())):
 		return
 	var fits: bool = inventory_data.fits_slot(held.item_data, equip_index) and held.item_data.meets_requirements()
 	var color: Color = FIT_COLOR if fits else BLOCKED_COLOR
@@ -99,21 +110,50 @@ func _make_custom_tooltip(_for_text: String) -> Object:
 	var item: Itemdata = inventory_data.get_equipped(equip_index)
 	if item == null or inventory_data.held != null:
 		return null
-	return ItemTooltip.build(item, 1, "Clic: agarrar · Clic derecho: a la mochila", false)
+	return ItemTooltip.build(item, 1, "Clic o arrastrar: mover · Clic derecho: sacar a la mochila", false)
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		ItemDrag.motion(event.global_position)
+		return
 	var mouse_event := event as InputEventMouseButton
-	if mouse_event == null or not mouse_event.pressed:
+	if mouse_event == null:
+		return
+	if not mouse_event.pressed:
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and ItemDrag.release(self, mouse_event.global_position):
+			accept_event()
 		return
 	if mouse_event.button_index == MOUSE_BUTTON_LEFT:
-		var moving: Slotdata = inventory_data.held if inventory_data.held else inventory_data.equipment[equip_index]
-		inventory_data.on_equipment_clicked(equip_index)
-		if moving:
-			sfx.play_item(moving.item_data)
+		var picking: bool = inventory_data.held == null and inventory_data.equipment[equip_index] != null
+		if inventory_data.held:
+			accept_drop()
+		else:
+			_pick()
+		if picking:
+			ItemDrag.begin(mouse_event.global_position)
 		accept_event()
-	elif mouse_event.button_index == MOUSE_BUTTON_RIGHT and inventory_data.held == null:
+	elif mouse_event.button_index == MOUSE_BUTTON_RIGHT:
+		if inventory_data.held:
+			inventory_data.return_held()
 		# Clic derecho: desequipa directo a la grilla.
-		if inventory_data.unequip(equip_index):
+		elif inventory_data.unequip(equip_index):
 			sfx.play("drag_weapon")
 		accept_event()
+
+
+## Equipa aca el item agarrado (clic con algo en la mano o fin de un arrastre).
+func accept_drop(_position: Vector2 = Vector2.ZERO) -> void:
+	var moving: Slotdata = inventory_data.held
+	if moving == null:
+		return
+	inventory_data.on_equipment_clicked(equip_index)
+	if inventory_data.held != moving:
+		sfx.play_item(moving.item_data)
+
+
+func _pick() -> void:
+	var moving: Slotdata = inventory_data.equipment[equip_index]
+	inventory_data.on_equipment_clicked(equip_index)
+	if moving:
+		sfx.play_item(moving.item_data)

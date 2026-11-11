@@ -8,7 +8,6 @@ const Nameplates := preload("res://ui/nameplates.gd")
 const ComboSlot := preload("res://ui/combo_slot.gd")
 const MapOverlay := preload("res://ui/map_overlay.gd")
 const BestiaryPanel := preload("res://ui/bestiary_panel.gd")
-const PassivesPanel := preload("res://ui/passives_panel.gd")
 const TrainerPanel := preload("res://ui/trainer_panel.gd")
 const RunePanel := preload("res://ui/rune_panel.gd")
 const POTION := preload("res://item/items/potion_of_health.tres")
@@ -35,6 +34,8 @@ const POISON_FILL := preload("res://ui/theme/textures/fill_poison.png")
 
 var player: CharacterBody3D
 var _message_time: float = 0.0
+## Mensajes que esperan a que termine el que se ve: [texto, color, duracion].
+var _message_queue: Array = []
 var _respawn_countdown: float = -1.0
 ## Murio en modo extremo: el cartel queda hasta volver al titulo.
 var _fallen: bool = false
@@ -68,7 +69,7 @@ func _ready() -> void:
 	$Root.add_child(overlay)
 	$Root.move_child(overlay, 0)
 	var panels: Node = get_parent().get_node_or_null("UI")
-	for panel in [BestiaryPanel.new(), PassivesPanel.new(), TrainerPanel.new(), RunePanel.new()]:
+	for panel in [BestiaryPanel.new(), TrainerPanel.new(), RunePanel.new()]:
 		(panels if panels else self).add_child.call_deferred(panel)
 	_on_health_changed(player_stats.health, player_stats.get_max_health())
 	_on_xp_changed(player_stats.xp, player_stats.xp_for_next_level())
@@ -115,6 +116,14 @@ func _process(delta: float) -> void:
 	_update_low_health(delta)
 	_update_buffs()
 	_update_clock()
+
+
+## Muestra el texto despues del que se esta viendo (o ya, si no hay ninguno).
+func queue_message(text: String, color: Color = Color(1.0, 0.86, 0.45), duration: float = 2.5) -> void:
+	if message_label.visible and _message_time > 0.0:
+		_message_queue.append([text, color, duration])
+	else:
+		show_message(text, color, duration)
 
 
 ## Muestra un texto grande en el centro durante unos segundos.
@@ -210,7 +219,7 @@ func _on_skill_slot_pressed(index: int) -> void:
 func _on_skill_unlocked(index: int) -> void:
 	var skill: SkillData = skill_book.get_skill(index)
 	sfx.play("new_spell" if skill.kind == SkillData.Kind.PROJECTILE else "new_skill")
-	show_message("Nueva habilidad: %s (tecla %d)" % [skill.name, index + 1], Color(0.6, 0.9, 1.0), 3.0)
+	queue_message("Nueva habilidad: %s (tecla %d)" % [skill.name, index + 1], Color(0.6, 0.9, 1.0), 3.0)
 
 
 # Casilla de pociones al final de la barra: icono, cantidad y tecla Q.
@@ -375,8 +384,7 @@ func _on_leveled_up(new_level: int) -> void:
 	level_label.text = str(new_level)
 	show_message("¡Nivel %d!" % new_level)
 	if new_level in Passives.SLOT_LEVELS:
-		await get_tree().create_timer(2.6, false).timeout
-		show_message("Podés elegir una pasiva nueva (tecla P)", Color(0.6, 0.9, 1.0), 3.0)
+		queue_message("Podés elegir una pasiva nueva (C, pestaña Pasivas)", Color(0.6, 0.9, 1.0), 3.0)
 
 
 func _on_died() -> void:
@@ -428,3 +436,6 @@ func _update_message(delta: float) -> void:
 	message_label.modulate.a = clampf(_message_time / 0.6, 0.0, 1.0)
 	if _message_time <= 0.0:
 		message_label.visible = false
+		if not _message_queue.is_empty():
+			var next: Array = _message_queue.pop_front()
+			show_message(next[0], next[1], next[2])

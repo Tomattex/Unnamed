@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_item")
 name = "Runa: Abanico de Virotes"
-description = "Leela (doble clic) para aprender Abanico de Virotes o subirla un nivel."
+description = "Clic derecho en el inventario para leerla: aprende Abanico de Virotes antes de tiempo o la sube un nivel."
 stackable = true
 item_type = 15
 texture = ExtResource("2_icon")

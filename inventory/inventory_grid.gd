@@ -2,12 +2,15 @@ extends Control
 
 ## Grilla de items: la mochila (inventory_data.backpack) o el baul
 ## (inventory_data.stash), segun grid. Cada item ocupa su forma. Clic: agarrar
-## o soltar (si lo que se suelta tapa un solo item, se cambian) · Doble clic:
-## equipar o beber (en el baul, pasar a la mochila) · Clic derecho: con el baul
-## abierto pasa el item a la otra grilla; si no, vende con la tienda abierta o
-## tira; con algo agarrado, cancela.
+## o soltar (si lo que se suelta tapa un solo item, se cambian); tambien se
+## puede arrastrar manteniendo el clic (inventory/item_drag.gd) · Clic derecho
+## o doble clic: usar (equipar, beber, leer la runa); con el baul abierto pasa
+## el item a la otra grilla y con la tienda abierta lo vende · Con algo
+## agarrado, el clic derecho lo devuelve. Para tirar algo se suelta fuera de
+## la ventana.
 
 const GridItem := preload("res://inventory/grid_item.gd")
+const ItemDrag := preload("res://inventory/item_drag.gd")
 const CELL: int = 40
 ## Si el segundo clic de un doble clic llega con el item recien agarrado,
 ## se devuelve y se hace la accion del doble clic.
@@ -26,6 +29,7 @@ var _picked_at: float = -10.0
 func _ready() -> void:
 	custom_minimum_size = Vector2(grid.size * CELL)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	add_to_group("item_drop_targets")
 	if grid == inventory_data.stash:
 		inventory_data.stash_changed.connect(rebuild)
 	else:
@@ -75,7 +79,7 @@ func _draw() -> void:
 	var held: Slotdata = inventory_data.held
 	if held == null or not Rect2(Vector2.ZERO, size).has_point(get_local_mouse_position()):
 		return
-	var pos: Vector2i = _target_position(held.item_data)
+	var pos: Vector2i = _target_position(held.item_data, get_local_mouse_position())
 	var color: Color = BLOCKED_COLOR
 	if grid.fits_in_grid(held.item_data, pos):
 		var under: int = grid.overlapping(held.item_data, pos).size()
@@ -85,16 +89,16 @@ func _draw() -> void:
 	draw_rect(rect, Color(color, 0.9), false, 2.0)
 
 
-## Casilla de la esquina del item agarrado para que quede centrado en el mouse.
-func _target_position(item: Itemdata) -> Vector2i:
+## Casilla de la esquina del item agarrado para que quede centrado en el
+## mouse (local: posicion del mouse en la grilla).
+func _target_position(item: Itemdata, local: Vector2) -> Vector2i:
 	var footprint: Vector2i = item.get_footprint()
-	var corner: Vector2 = get_local_mouse_position() / CELL - Vector2(footprint) / 2.0
+	var corner: Vector2 = local / CELL - Vector2(footprint) / 2.0
 	var pos := Vector2i(roundi(corner.x), roundi(corner.y))
 	return pos.clamp(Vector2i.ZERO, grid.size - footprint)
 
 
-func _cell_under_mouse() -> Vector2i:
-	var local: Vector2 = get_local_mouse_position()
+func _cell_at(local: Vector2) -> Vector2i:
 	return Vector2i(floori(local.x / CELL), floori(local.y / CELL))
 
 
@@ -103,44 +107,64 @@ func _other_grid() -> ItemGrid:
 
 
 func _gui_input(event: InputEvent) -> void:
-	var mouse_event := event as InputEventMouseButton
-	if mouse_event == null or not mouse_event.pressed:
+	if event is InputEventMouseMotion:
+		ItemDrag.motion(event.global_position)
 		return
+	var mouse_event := event as InputEventMouseButton
+	if mouse_event == null:
+		return
+	if not mouse_event.pressed:
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and ItemDrag.release(self, mouse_event.global_position):
+			accept_event()
+		return
+	var cell: Vector2i = _cell_at(mouse_event.position)
 	var now: float = Time.get_ticks_msec() / 1000.0
 	match mouse_event.button_index:
 		MOUSE_BUTTON_LEFT:
 			if mouse_event.double_click and inventory_data.held != null and now - _picked_at < DOUBLE_CLICK_GRACE:
 				inventory_data.return_held()
-				_double_click(grid.slot_at(_cell_under_mouse()))
+				ItemDrag.cancel()
+				use_slot(grid.slot_at(cell))
 			elif inventory_data.held != null:
-				var item: Itemdata = inventory_data.held.item_data
-				if inventory_data.place_held(_target_position(item), grid):
-					sfx.play_item(item)
-				else:
-					sfx.play("stuck", -6.0)
+				accept_drop(mouse_event.global_position)
 			else:
-				var index: int = grid.slot_at(_cell_under_mouse())
+				var index: int = grid.slot_at(cell)
 				if index >= 0:
 					sfx.play_item(grid.slots[index].item_data)
 					inventory_data.pick_up(index, grid)
 					_picked_at = now
+					ItemDrag.begin(mouse_event.global_position)
 			accept_event()
 		MOUSE_BUTTON_RIGHT:
 			if inventory_data.held != null:
 				inventory_data.return_held()
 			else:
-				var index: int = grid.slot_at(_cell_under_mouse())
+				var index: int = grid.slot_at(cell)
 				if index >= 0:
-					if inventory_data.stash_open:
+					if grid == inventory_data.stash or inventory_data.stash_open:
 						_move_to_other_grid(index)
 					elif inventory_data.shop_mode:
 						inventory_data.sell_requested.emit(index)
 					else:
-						inventory_data.drop_slot(index, grid)
+						use_slot(index)
 			accept_event()
 
 
-func _double_click(index: int) -> void:
+## Suelta aca el item agarrado (clic con algo en la mano o fin de un
+## arrastre). position: la del mouse, global.
+func accept_drop(position: Vector2) -> void:
+	if inventory_data.held == null:
+		return
+	var item: Itemdata = inventory_data.held.item_data
+	if inventory_data.place_held(_target_position(item, position - get_global_rect().position), grid):
+		sfx.play_item(item)
+	else:
+		sfx.play("stuck", -6.0)
+
+
+## Usa el item: equipa el equipo, bebe o usa los consumibles y lee las runas.
+## En el baul lo pasa a la mochila.
+func use_slot(index: int) -> void:
 	if index < 0:
 		return
 	if grid == inventory_data.stash:
@@ -156,8 +180,15 @@ func _double_click(index: int) -> void:
 			inventory_data.equip_rejected.emit(problem)
 	elif item.is_consumable():
 		player_stats.try_consume(item)
-	elif inventory_data.equip_from_slot(index):
-		sfx.play_item(item)
+	elif item.is_equipment():
+		if inventory_data.equip_from_slot(index):
+			sfx.play_item(item)
+	else:
+		sfx.play("stuck", -8.0)
+		if item.item_type == Itemdata.ItemType.GEM:
+			inventory_data.equip_rejected.emit("Las gemas se engarzan en la herrería")
+		else:
+			inventory_data.equip_rejected.emit("Esto no se usa. Para tirarlo, soltalo fuera de la ventana")
 
 
 func _move_to_other_grid(index: int) -> void:

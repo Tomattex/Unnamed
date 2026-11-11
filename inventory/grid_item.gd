@@ -71,21 +71,26 @@ func _make_custom_tooltip(_for_text: String) -> Object:
 	if inventory_data.held != null:
 		return null
 	if get_parent().get("grid") == inventory_data.stash:
-		return ItemTooltip.build(slot.item_data, slot.quantity, "Clic: agarrar · Doble clic o clic derecho: al inventario")
-	var right_click: String = "tirar"
+		return ItemTooltip.build(slot.item_data, slot.quantity, "Clic o arrastrar: mover · Clic derecho: a la mochila")
+	var item: Itemdata = slot.item_data
+	var right_click: String = ""
 	if inventory_data.stash_open:
 		right_click = "guardar en el baúl"
 	elif inventory_data.shop_mode:
-		right_click = "vender (%d oro)" % (maxi(1, slot.item_data.value / 4) * slot.quantity)
-	var hint: String = "Clic: agarrar · Clic derecho: " + right_click
-	if slot.item_data.is_equipment():
-		hint = "Clic: agarrar · Doble clic: equipar · Clic derecho: " + right_click
-	elif slot.item_data.is_rune():
-		hint = "Doble clic: leer la runa · Clic derecho: " + right_click
-	elif slot.item_data.is_health_potion():
-		hint = "Doble clic o Q: beber · Clic derecho: " + right_click
-	elif slot.item_data.is_consumable():
-		var key: int = inventory_data.belt.find(slot.item_data.resource_path)
-		var belt_hint: String = " o %s" % ["W", "E", "R", "T"][key] if key >= 0 else ""
-		hint = "Doble clic%s: usar · W E R T: al cinturón · Clic derecho: %s" % [belt_hint, right_click]
-	return ItemTooltip.build(slot.item_data, slot.quantity, hint)
+		right_click = "vender (%d oro)" % (maxi(1, item.value / 4) * slot.quantity)
+	elif item.is_equipment():
+		right_click = "equipar"
+	elif item.is_rune():
+		right_click = "leer la runa"
+	elif item.is_health_potion():
+		right_click = "beber (o Q)"
+	elif item.is_consumable():
+		var key: int = inventory_data.belt.find(item.resource_path)
+		right_click = "usar" + (" (o %s)" % ["W", "E", "R", "T"][key] if key >= 0 else "")
+	var parts := PackedStringArray(["Clic o arrastrar: mover"])
+	if not right_click.is_empty():
+		parts.append("Clic derecho: " + right_click)
+	if item.is_consumable() and not item.is_health_potion():
+		parts.append("W E R T: al cinturón")
+	parts.append("Soltar fuera de la ventana: tirar")
+	return ItemTooltip.build(item, slot.quantity, " · ".join(parts))
