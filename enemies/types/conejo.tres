@@ -16,6 +16,7 @@ walk_animations = Array[String](["walk"])
 run_animation = "walk"
 run_animation_speed = 2.2
 death_animation = "death"
+death_topple = true
 passive = true
 flee_range = 700.0
 max_health = 6.0

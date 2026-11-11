@@ -36,6 +36,10 @@ enum Role { NONE, HEALER, LEADER, NECROMANCER }
 ## Si es true, la animacion de muerte se reproduce al reves (sirve cuando el
 ## modelo solo tiene una animacion de "levantarse del suelo").
 @export var death_reversed: bool = false
+## Al morir no usa animacion: queda congelado y se desploma de costado. Para
+## los animales de 0 A.D., cuyas muertes quedaron mal al convertirlas (el
+## ciervo terminaba parado sobre el lomo).
+@export var death_topple: bool = false
 ## Animaciones al recibir un golpe (se elige una). Vacio = solo se sacude.
 @export var hit_animations: Array[String] = []
 ## Otras muertes posibles ademas de death_animation (se elige una al azar).

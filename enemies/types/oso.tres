@@ -14,6 +14,7 @@ idle_animation = "idle"
 walk_animations = Array[String](["walk"])
 attack_animations = Array[String](["attack_a", "attack_c", "attack_b"])
 death_animation = "death"
+death_topple = true
 run_animation = "run"
 walk_animation_speed = 0.8
 hunts_animals = true

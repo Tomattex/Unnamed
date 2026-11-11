@@ -40,6 +40,11 @@ const BASE_ENEMY_RADIUS: float = 60.0
 const ACCELERATION: float = 7000.0
 ## Al acercarse al destino frena de a poco en esta distancia.
 const ARRIVE_DISTANCE: float = 110.0
+## Clic en algo que no es piso: se busca el punto caminable yendo hacia la
+## camara de a este paso (hasta WALK_PROBE_STEPS veces).
+const WALK_PROBE_STEP: float = 50.0
+const WALK_PROBE_STEPS: int = 14
+const WALK_PROBE_TOLERANCE: float = 20.0
 
 var target_enemy: Node3D = null
 var hovered_enemy: Node3D = null
@@ -320,14 +325,15 @@ func _handle_click() -> void:
 			click_reference.hide()
 		return
 
-	var result: Dictionary = _raycast_mouse()
-	if result.is_empty():
+	var thing: Node3D = _interactive_under_mouse()
+	var ground: Vector3 = _ground_under_mouse()
+	if thing == null and not ground.is_finite():
 		return
 	target_pickup = null
 	target_npc = null
 
-	if result.collider is Node and result.collider.is_in_group("npcs"):
-		target_npc = result.collider
+	if thing and thing.is_in_group("npcs"):
+		target_npc = thing
 		target_enemy = null
 		pending_skill = -1
 		pending_combo = false
@@ -335,7 +341,7 @@ func _handle_click() -> void:
 		_move_to(target_npc.global_position)
 		return
 
-	var enemy: Node3D = _enemy_from_collider(result.collider)
+	var enemy: Node3D = _enemy_from_collider(thing) if thing else null
 	pending_skill = -1
 	pending_combo = false
 	if enemy:
@@ -349,7 +355,7 @@ func _handle_click() -> void:
 	target_enemy = null
 	_holding_move = true
 	_hold_timer = 0.0
-	_move_to_ground(result.position)
+	_move_to_ground(ground)
 
 
 # Mantener el clic apretado sigue moviendo al personaje hacia el mouse.
@@ -363,9 +369,9 @@ func _update_hold(delta: float) -> void:
 	if _hold_timer < HOLD_REPATH_INTERVAL:
 		return
 	_hold_timer = 0.0
-	var result: Dictionary = _raycast_mouse()
-	if not result.is_empty() and _enemy_under_mouse() == null:
-		_move_to_ground(result.position)
+	var ground: Vector3 = _ground_under_mouse()
+	if ground.is_finite() and _enemy_under_mouse() == null:
+		_move_to_ground(ground)
 
 
 ## Intenta usar la habilidad del slot (teclas 1-5 o clic en la barra).
@@ -395,9 +401,9 @@ func use_skill(index: int) -> void:
 	if is_instance_valid(hovered_enemy):
 		aim = hovered_enemy.global_position
 	else:
-		var result: Dictionary = _raycast_mouse()
-		if not result.is_empty():
-			aim = result.position
+		var ground: Vector3 = _ground_under_mouse()
+		if ground.is_finite():
+			aim = ground
 	combat.use_skill(index, aim, hovered_enemy)
 
 
@@ -428,9 +434,9 @@ func use_combo() -> void:
 	if enemy:
 		aim = enemy.global_position
 	else:
-		var result: Dictionary = _raycast_mouse()
-		if not result.is_empty():
-			aim = result.position
+		var ground: Vector3 = _ground_under_mouse()
+		if ground.is_finite():
+			aim = ground
 	combat.use_combo(aim, enemy)
 
 
@@ -456,14 +462,65 @@ func _move_to(point: Vector3) -> void:
 	nav_agent.target_position = point
 
 
-# Clic en el piso (o en una roca, una casa, el agua): va al punto caminable
-# mas cercano al lugar del piso que se clickeo. Se busca a la altura del piso
-# (el mundo es plano): si se buscara desde el techo de una casa, lo "mas
-# cercano" podia quedar a un costado. La marca va a donde de verdad termina
-# el camino (ver _on_path_changed).
+# Clic en el piso: va al punto del piso que esta bajo el mouse (el rayo se
+# cruza con el plano del piso, sin chocar con paredes ni casas: si no, una
+# pared ya transparente delante del jugador se quedaba con el clic y lo
+# mandaba contra ella). La marca va a donde de verdad termina el camino (ver
+# _on_path_changed).
 func _move_to_ground(point: Vector3) -> void:
-	var on_ground := Vector3(point.x, 0.0, point.z)
-	_move_to(NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, on_ground))
+	_move_to(_walk_target(Vector3(point.x, 0.0, point.z)))
+
+
+## Punto del piso (y = 0) bajo el mouse; INF si el mouse apunta al cielo.
+func _ground_under_mouse() -> Vector3:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		return Vector3.INF
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	var from: Vector3 = camera.project_ray_origin(mouse_pos)
+	var dir: Vector3 = camera.project_ray_normal(mouse_pos)
+	if dir.y > -0.01:
+		return Vector3.INF
+	return from + dir * (-from.y / dir.y)
+
+
+## Adonde caminar para un punto del piso: el punto caminable mas cercano
+## buscando hacia la camara. Un clic sobre una casa, una roca o un poste cae
+## en el piso detras de lo que se ve; asi el jugador va al frente (lo que se
+## ve) y no da la vuelta hasta el otro lado.
+func _walk_target(point: Vector3) -> Vector3:
+	var map: RID = get_world_3d().navigation_map
+	if NavigationServer3D.map_get_iteration_id(map) == 0:
+		return point
+	var back := Vector3.ZERO
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera:
+		back = camera.global_position - point
+		back.y = 0.0
+		back = back.normalized()
+	for i in WALK_PROBE_STEPS:
+		var probe: Vector3 = point + back * WALK_PROBE_STEP * i
+		var closest: Vector3 = NavigationServer3D.map_get_closest_point(map, probe)
+		if Vector2(closest.x - probe.x, closest.z - probe.z).length() < WALK_PROBE_TOLERANCE:
+			return closest
+	return NavigationServer3D.map_get_closest_point(map, point)
+
+
+# Un NPC o un enemigo bajo el mouse, atravesando paredes, casas y rocas (una
+# pared que se desvanecio delante del jugador no tiene que tapar el clic).
+func _interactive_under_mouse() -> Node3D:
+	var exclude: Array[RID] = []
+	for i in 4:
+		var hit: Dictionary = _raycast_mouse(0xFFFFFFFF, false, exclude)
+		if hit.is_empty():
+			return null
+		var collider: Object = hit.collider
+		if collider is Node3D and (collider.is_in_group("npcs") or _enemy_from_collider(collider) != null):
+			return collider
+		if not collider is CollisionObject3D:
+			return null
+		exclude.append(collider.get_rid())
+	return null
 
 
 func _on_path_changed() -> void:
@@ -506,7 +563,7 @@ func _enemy_from_collider(collider: Object) -> Node3D:
 	return null
 
 
-func _raycast_mouse(mask: int = 0xFFFFFFFF, areas_only: bool = false) -> Dictionary:
+func _raycast_mouse(mask: int = 0xFFFFFFFF, areas_only: bool = false, exclude: Array[RID] = []) -> Dictionary:
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if camera == null:
 		return {}
@@ -515,7 +572,9 @@ func _raycast_mouse(mask: int = 0xFFFFFFFF, areas_only: bool = false) -> Diction
 	var from: Vector3 = camera.project_ray_origin(mouse_pos)
 	var to: Vector3 = from + camera.project_ray_normal(mouse_pos) * ray_length
 	var ray_query := PhysicsRayQueryParameters3D.create(from, to, mask)
-	ray_query.exclude = [get_rid()]
+	var excluded: Array[RID] = [get_rid()]
+	excluded.append_array(exclude)
+	ray_query.exclude = excluded
 	if areas_only:
 		ray_query.collide_with_areas = true
 		ray_query.collide_with_bodies = false

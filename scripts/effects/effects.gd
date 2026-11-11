@@ -391,6 +391,9 @@ static func body_hit(parent: Node, position: Vector3, body: int, size: float, bi
 	mark.texture_albedo = SCORCHES.pick_random()
 	mark.size = Vector3(radius * 2.0, 160.0, radius * 2.0)
 	mark.modulate = Color(color, 0.85)
+	# Solo el piso y las piezas del mundo (capa del mapa, 1 << 15): si no, la
+	# mancha se pintaba en las patas del que estaba parado encima.
+	mark.cull_mask = 1 << 15
 	mark.upper_fade = 0.0
 	mark.lower_fade = 0.0
 	add_at(parent, mark, ground + Vector3.UP * 40.0 + Vector3(randf_range(-0.5, 0.5), 0.0, randf_range(-0.5, 0.5)) * size)

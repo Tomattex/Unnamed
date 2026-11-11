@@ -61,10 +61,10 @@ func _physics_process(delta: float) -> void:
 	_talk_cooldown -= delta
 	if night:
 		_target = home
-	var left: float = Vector2(_target.x - global_position.x, _target.z - global_position.z).length()
-	if left > 40.0 and _walking_for < GIVE_UP_TIME:
+	# walk_to mide hasta el final del camino: si la puerta o el lugar quedan
+	# adentro de algo, llega a lo mas cercano y listo.
+	if _walking_for < GIVE_UP_TIME and walk_to(_target, SPEED, delta) > 40.0:
 		_walking_for += delta
-		walk_to(_target, SPEED, delta)
 		play("walk")
 		_try_talk(false, delta)
 		return

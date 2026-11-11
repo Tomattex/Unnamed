@@ -852,11 +852,11 @@ func _prop(parent: Node3D, path: String, pos: Vector3, angle: float, scale: floa
 
 ## Pieza del fuerte modular (todas vienen en el mismo archivo, en el origen).
 ## Los portones llevan colision solo en los costados, para pasar por el arco.
-func _fort_piece(parent: Node3D, piece: String, pos: Vector3, angle: float, scale: float) -> void:
+func _fort_piece(parent: Node3D, piece: String, pos: Vector3, angle: float, scale: float, collide: bool = true) -> Node3D:
 	var is_gate: bool = piece.contains("gate")
-	var prop: Node3D = _prop(parent, FORT, pos, angle, scale, 0.0 if is_gate else 1.0, {"keep_only": piece, "fade_when_occluding": true}, true)
+	var prop: Node3D = _prop(parent, FORT, pos, angle, scale, 0.0 if is_gate or not collide else 1.0, {"keep_only": piece, "fade_when_occluding": true}, true)
 	if not is_gate:
-		return
+		return prop
 	var bounds: AABB = _model_bounds(prop.get_child(0), piece)
 	var body := StaticBody3D.new()
 	body.name = "Colision"
@@ -868,6 +868,7 @@ func _fort_piece(parent: Node3D, piece: String, pos: Vector3, angle: float, scal
 		shape.shape = box
 		shape.position = Vector3(bounds.get_center().x, bounds.size.y / 2.0, bounds.position.z + bounds.size.z * (side + 0.15))
 		body.add_child(shape)
+	return prop
 
 
 func _scene(path: String) -> PackedScene:
@@ -1194,45 +1195,82 @@ func _build_village_wall(village: Node3D) -> void:
 		for spot in gate_spots:
 			_wall_run(wall, start, along, free_from, spot - GATE_LENGTH / 2.0, true)
 			var gate_center: Vector2 = start + along * spot
-			_wall_piece(wall, "modular_fort_01_wall_thin_gate_01", gate_center, along, 100.0)
+			_wall_piece(wall, "modular_fort_01_wall_thin_gate_01", gate_center, along, 100.0, GATE_STRETCH)
 			_gates.append({"center": gate_center, "along": along, "normal": outward})
 			free_from = spot + GATE_LENGTH / 2.0
 		_wall_run(wall, start, along, free_from, length - tower_radius, false)
 
 
-const GATE_LENGTH: float = 741.0
+## Largo de las piezas del fuerte (escala 100): el porton y la pared corta
+## miden 741, la pared larga 1482. Los portones van estirados a lo largo para
+## que el paso sea mas ancho (con 741 quedaba de un metro y poco).
+const GATE_PIECE_LENGTH: float = 741.0
+const GATE_STRETCH: float = 1.5
+const GATE_LENGTH: float = GATE_PIECE_LENGTH * GATE_STRETCH
 const WALL_LENGTH: float = 1482.0
+const SHORT_WALL_LENGTH: float = 741.0
+const WALL_THICKNESS: float = 235.0
+const WALL_HEIGHT: float = 860.0
 
 
-# Muro recto entre dos distancias del lado: piezas de 1482 que se pisan un
-# poco para que la ultima termine justo donde tiene que terminar.
+# Muro recto entre dos distancias del lado. Las piezas entran justas, una al
+# lado de la otra y un poco estiradas o achicadas a lo largo: si se pisaran,
+# las caras quedarian en el mismo plano y parpadearian. Se elige entre la
+# pieza larga y la corta la que menos tenga que estirarse. La colision es una
+# sola caja por tramo (las cajas de cada pieza dejaban rendijas entre si).
 func _wall_run(parent: Node3D, start: Vector2, along: Vector2, from: float, to: float, gate_at_end: bool) -> void:
 	var length: float = to - from
 	if length < 60.0:
 		return
-	if length <= GATE_LENGTH:
-		# Una pieza corta pegada al porton (lo que sobra se mete en la torre).
-		var middle: float = to - GATE_LENGTH / 2.0 if gate_at_end else from + GATE_LENGTH / 2.0
-		_wall_piece(parent, "modular_fort_01_wall_thin_straight_04", start + along * middle, along, 100.0)
+	_wall_collider(parent, start + along * (from + to) / 2.0, along, length + 40.0)
+	if length < SHORT_WALL_LENGTH * 0.7:
+		# Muy corto: una pieza corta pegada al porton (lo que sobra se mete en la torre).
+		var middle: float = to - SHORT_WALL_LENGTH / 2.0 if gate_at_end else from + SHORT_WALL_LENGTH / 2.0
+		_wall_piece(parent, "modular_fort_01_wall_thin_straight_04", start + along * middle, along, 100.0, 1.0, false)
 		return
-	var count: int = ceili(length / WALL_LENGTH)
-	var step: float = (length - WALL_LENGTH) / maxf(count - 1, 1)
-	for i in count:
-		var middle: float = from + WALL_LENGTH / 2.0 + step * i if count > 1 else from + length / 2.0
-		_wall_piece(parent, "modular_fort_01_wall_thin_straight_01", start + along * middle, along, 100.0)
+	var best_piece: String = ""
+	var best_length: float = 0.0
+	var best_count: int = 0
+	var best_error: float = INF
+	for option in [["modular_fort_01_wall_thin_straight_01", WALL_LENGTH], ["modular_fort_01_wall_thin_straight_04", SHORT_WALL_LENGTH]]:
+		var count: int = maxi(1, roundi(length / option[1]))
+		var error: float = absf(length / (count * option[1]) - 1.0)
+		if error < best_error - 0.02:
+			best_error = error
+			best_piece = option[0]
+			best_length = option[1]
+			best_count = count
+	var stretch: float = length / (best_count * best_length)
+	for i in best_count:
+		var middle: float = from + best_length * stretch * (i + 0.5)
+		_wall_piece(parent, best_piece, start + along * middle, along, 100.0, stretch, false)
+
+
+func _wall_collider(parent: Node3D, center: Vector2, along: Vector2, length: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "ColisionMuro"
+	body.transform = Transform3D(Basis(Vector3.UP, atan2(along.x, along.y)), Vector3(center.x, WALL_HEIGHT / 2.0, center.y))
+	parent.add_child(body, true)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(WALL_THICKNESS, WALL_HEIGHT, length)
+	shape.shape = box
+	body.add_child(shape)
 
 
 ## Pieza del fuerte con el centro de su caja en center y su largo (eje z del
-## modelo) a lo largo de along.
-func _wall_piece(parent: Node3D, piece: String, center: Vector2, along: Vector2, scale: float) -> void:
+## modelo) a lo largo de along, estirado stretch veces.
+func _wall_piece(parent: Node3D, piece: String, center: Vector2, along: Vector2, scale: float, stretch: float = 1.0, collide: bool = true) -> void:
 	if not _fort_bounds.has(piece):
 		var model: Node3D = _scene(FORT).instantiate()
 		_fort_bounds[piece] = _model_bounds(model, piece)
 		model.free()
 	var bounds: AABB = _fort_bounds[piece]
 	var angle: float = atan2(along.x, along.y)
-	var offset: Vector3 = Basis(Vector3.UP, angle) * Vector3(bounds.get_center().x, 0.0, bounds.get_center().z) * scale
-	_fort_piece(parent, piece, Vector3(center.x, 0, center.y) - offset, angle, scale)
+	var offset: Vector3 = Basis(Vector3.UP, angle) * Vector3(bounds.get_center().x * scale, 0.0, bounds.get_center().z * scale * stretch)
+	var prop: Node3D = _fort_piece(parent, piece, Vector3(center.x, 0, center.y) - offset, angle, scale, collide)
+	if stretch != 1.0:
+		prop.scale = Vector3(scale, scale, scale * stretch)
 
 
 # --- Agua: rios, mar, charcos y puentes ---------------------------------------

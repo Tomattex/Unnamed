@@ -94,6 +94,8 @@ const FLEE_TIME: float = 4.0
 ## parte de su deteccion, dejan la presa y van por el.
 const HUNT_CHECK: float = 0.5
 const PREFER_PLAYER: float = 0.6
+## Si el jugador le pego hace menos que esto, un aliado no se lo saca de encima.
+const PLAYER_FOCUS_TIME: float = 3.0
 const HUNT_SPRINT: float = 1.35
 ## Los que mantienen distancia retroceden esto como maximo cada vez.
 const RETREAT_TIME: float = 1.1
@@ -178,6 +180,11 @@ var _slot := Vector3.INF
 var _slot_time: float = 0.0
 ## Presa que esta cazando (animal o aldeano); null = el jugador.
 var _prey: Node3D
+## La "presa" es un aliado del jugador (un guardia) que le pego: lo sigue a el
+## aunque el jugador este cerca, hasta que el jugador le pegue o el aliado caiga.
+var _ally_focus: bool = false
+## Ultima vez que le pego el jugador (no se distrae con un aliado enseguida).
+var _player_hit_at: float = -100.0
 var _hunt_timer: float = 0.0
 ## Fauna: de que huye y por cuanto tiempo mas.
 var _threat: Node3D
@@ -500,12 +507,14 @@ func _physics_process(delta: float) -> void:
 		_prey = null
 		if state == State.CHASE or state == State.ATTACK:
 			_give_up()
+	if _prey == null:
+		_ally_focus = false
 	var hunting: bool = _prey != null
 	var to_target: Vector3 = to_player
 	if hunting:
 		to_target = _prey.global_position - global_position
 		to_target.y = 0.0
-		if player_alive and player_dist <= data.detection_range * PREFER_PLAYER:
+		if player_alive and player_dist <= data.detection_range * PREFER_PLAYER and not _ally_focus:
 			# El jugador se metio: deja la presa y va por el.
 			_prey = null
 			hunting = false
@@ -1133,6 +1142,12 @@ func take_hit(hit: Dictionary) -> void:
 		_react(hit, amount)
 		if hit.get("player", false):
 			player_stats.on_hit_dealt(self, amount)
+	if hit.get("player", false):
+		_player_hit_at = Time.get_ticks_msec() / 1000.0
+		if _ally_focus:
+			# El jugador se metio: deja al aliado y va por el.
+			_ally_focus = false
+			_prey = null
 	elif result.poison > 0.0 and not was_poisoned:
 		floating_text.spawn(head, "Envenenado", Damage.COLORS[Damage.Type.POISON], 18)
 
@@ -1146,8 +1161,30 @@ func take_hit(hit: Dictionary) -> void:
 		_enter_flee(source if is_instance_valid(source) else player)
 		_alert_pack()
 		return
+	if is_instance_valid(source) and source.is_in_group("allies") and not hit.get("player", false):
+		focus_ally(source)
+		_alert_pack(source)
+		return
 	_enter_chase()
 	_alert_pack()
+
+
+## Un aliado del jugador (guardia) lo ataco: pelea con el en vez de con el
+## jugador, como en Sacred. No cambia si el jugador le pego hace poco.
+func focus_ally(ally: Node3D) -> void:
+	if dead or data.passive or state == State.AMBUSH or state == State.SPAWNING:
+		return
+	if _ally_focus and _prey == ally:
+		return
+	if Time.get_ticks_msec() / 1000.0 - _player_hit_at < PLAYER_FOCUS_TIME:
+		return
+	_prey = ally
+	_ally_focus = true
+	_lose_timer = 0.0
+	_calm_time = 0.0
+	if state != State.ATTACK:
+		state = State.CHASE
+	_last_nav_target = Vector3.INF
 
 
 ## Golpe fisico simple (compatibilidad con codigo que todavia pasa un numero).
@@ -1234,7 +1271,8 @@ func heal(amount: float) -> void:
 
 
 # Cuando le pegan a uno, los cercanos que esten tranquilos tambien atacan.
-func _alert_pack() -> void:
+## ally: si al grupo lo desperto un aliado del jugador, van por ese aliado.
+func _alert_pack(ally: Node3D = null) -> void:
 	for other in get_tree().get_nodes_in_group("enemies"):
 		if other == self or other.dead or other.data.passive != data.passive:
 			continue
@@ -1242,6 +1280,10 @@ func _alert_pack() -> void:
 			continue
 		if data.passive:
 			other._enter_flee(_threat)
+		elif other._ally_focus:
+			continue
+		elif ally != null and (other.state in [State.IDLE, State.WANDER, State.PATROL] or other._prey != null):
+			other.focus_ally(ally)
 		elif other.state in [State.IDLE, State.WANDER, State.PATROL] or other._prey != null:
 			other._enter_chase()
 
@@ -1448,7 +1490,9 @@ func _die() -> void:
 	# Mira hacia donde vino el golpe: las muertes caen hacia atras, lejos de el.
 	if _last_hit_dir.length() > 1.0:
 		rotation.y = atan2(-_last_hit_dir.x, -_last_hit_dir.z)
-	if _anim_player:
+	if data.death_topple:
+		_topple()
+	elif _anim_player:
 		var anim_name: String = data.death_animation
 		var extra: Array[String] = data.extra_death_animations.filter(func(clip: String) -> bool: return _anim_player.has_animation(clip))
 		if not extra.is_empty() and randf() < 0.5:
@@ -1470,6 +1514,18 @@ func _die() -> void:
 	var tween := create_tween()
 	tween.tween_property(self, "position:y", position.y - 300.0, 1.5)
 	tween.tween_callback(queue_free)
+
+
+# Muerte sin animacion: se congela en la pose que tenia y cae de costado (la
+# caida acelera, rebota un poco y el cuerpo queda apoyado en el piso).
+func _topple() -> void:
+	if _anim_player:
+		_anim_player.pause()
+	var side: float = 1.0 if randf() < 0.5 else -1.0
+	var lift: float = data.collision_radius * 0.45 * _size
+	var tween := create_tween().set_parallel()
+	tween.tween_property(model_root, "rotation:z", side * PI * 0.5, 0.4).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(model_root, "position:y", model_root.position.y + lift, 0.4)
 
 
 # Lo anota para que un nigromante cercano lo pueda levantar.

@@ -10,6 +10,13 @@ const REPATH_INTERVAL: float = 0.5
 ## Distancia a la que un punto del camino cuenta como alcanzado.
 const POINT_REACHED: float = 30.0
 const LABEL_RANGE: float = 900.0
+## Atascos: cada STUCK_CHECK segundos mira si avanzo al menos STUCK_DISTANCE;
+## si no, recalcula el camino con un paso al costado y, si sigue trabado y
+## nadie lo ve, aparece en el punto siguiente del camino.
+const STUCK_CHECK: float = 0.5
+const STUCK_DISTANCE: float = 20.0
+const STUCK_SIDESTEP: float = 1.0
+const STUCK_TELEPORT: float = 3.0
 
 var _anim: AnimationPlayer
 var _model: Node3D
@@ -18,6 +25,10 @@ var _path := PackedVector3Array()
 var _path_index: int = 0
 var _repath: float = 0.0
 var _label_check: float = 0.0
+var _stuck_timer: float = 0.0
+var _stuck_for: float = 0.0
+var _stuck_from := Vector3.INF
+var _sidestep := Vector3.ZERO
 
 
 ## Arma el cuerpo: colision, modelo (con la ropa teñida de tint) y nombre.
@@ -27,8 +38,9 @@ func setup(model_path: String, tint: Color = Color.WHITE, display_name: String =
 	collision_mask = 1
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
-	capsule.radius = 60.0
 	capsule.height = 340.0
+	# Mas finito que el radio de la navegacion (60): asi no roza las esquinas.
+	capsule.radius = 42.0
 	shape.shape = capsule
 	shape.position.y = 185.0
 	add_child(shape)
@@ -51,13 +63,17 @@ func play(anim_name: String, blend: float = 0.2) -> void:
 		_anim.play(anim_name, blend)
 
 
-## Camina hacia goal por la navegacion. Devuelve la distancia que falta.
+## Camina hacia goal por la navegacion. Devuelve la distancia que falta hasta
+## el final del camino (si goal no se puede alcanzar, el lugar mas cercano).
 func walk_to(goal: Vector3, speed: float, delta: float) -> float:
 	_repath -= delta
 	if _repath <= 0.0 or _path_index >= _path.size():
 		_repath = REPATH_INTERVAL
-		_path = NavigationServer3D.map_get_path(get_world_3d().navigation_map, global_position, goal, true)
+		_path = NavigationServer3D.map_get_path(get_world_3d().navigation_map, global_position + _sidestep, goal, true)
 		_path_index = 1 if _path.size() > 1 else 0
+	if not _path.is_empty():
+		goal = _path[_path.size() - 1]
+	_check_stuck(goal, delta)
 	var next: Vector3 = goal
 	while _path_index < _path.size():
 		var point: Vector3 = _path[_path_index]
@@ -75,6 +91,34 @@ func walk_to(goal: Vector3, speed: float, delta: float) -> float:
 	var left: Vector3 = goal - global_position
 	left.y = 0.0
 	return left.length()
+
+
+func _check_stuck(goal: Vector3, delta: float) -> void:
+	_stuck_timer -= delta
+	if _stuck_timer > 0.0:
+		return
+	_stuck_timer = STUCK_CHECK
+	var moved: float = INF if not _stuck_from.is_finite() else Vector2(global_position.x - _stuck_from.x, global_position.z - _stuck_from.z).length()
+	_stuck_from = global_position
+	var left: float = Vector2(goal.x - global_position.x, goal.z - global_position.z).length()
+	if moved >= STUCK_DISTANCE or left < POINT_REACHED * 2.0:
+		_stuck_for = 0.0
+		_sidestep = Vector3.ZERO
+		return
+	_stuck_for += STUCK_CHECK
+	if _stuck_for >= STUCK_SIDESTEP:
+		# Probar desde un costado (el camino nuevo arranca de otro lado de la esquina).
+		_sidestep = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized() * 80.0
+		_repath = 0.0
+	if _stuck_for >= STUCK_TELEPORT and _path_index < _path.size() and not _on_screen():
+		global_position = Vector3(_path[_path_index].x, 0.0, _path[_path_index].z)
+		_stuck_for = 0.0
+		_repath = 0.0
+
+
+func _on_screen() -> bool:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	return camera != null and camera.is_position_in_frustum(global_position + Vector3.UP * 200.0)
 
 
 func face(dir: Vector3, delta: float, turn_speed: float = 6.0) -> void:
