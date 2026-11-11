@@ -147,7 +147,14 @@ func _double_click(index: int) -> void:
 		_move_to_other_grid(index)
 		return
 	var item: Itemdata = grid.slots[index].item_data
-	if item.is_consumable():
+	if item.is_rune():
+		var problem: String = skill_book.read_rune(item)
+		if problem.is_empty():
+			sfx.play("new_skill")
+		else:
+			sfx.play("stuck", -6.0)
+			inventory_data.equip_rejected.emit(problem)
+	elif item.is_consumable():
 		player_stats.try_consume(item)
 	elif inventory_data.equip_from_slot(index):
 		sfx.play_item(item)

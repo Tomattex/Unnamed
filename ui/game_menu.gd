@@ -86,7 +86,7 @@ func _build_main() -> VBoxContainer:
 		get_tree().quit())
 
 	var keys := Label.new()
-	keys.text = "I inventario · C personaje · B bestiario · Tab mapa · N mapa encima
+	keys.text = "I inventario · C personaje · P pasivas · B bestiario · Tab mapa · N mapa encima
 K combo · M montura · Q poción · W E R T cinturón · F juntar"
 	keys.theme_type_variation = &"DimLabel"
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -16,6 +16,8 @@ var speed: float = 1500.0
 var travel: float = 0.0
 ## Habilidad que la lanzo (alcance, radio, multiplicador y tipo de daño).
 var skill: SkillData
+## Nivel de la habilidad al tirarla (mas daño).
+var skill_level: int = 1
 var color: Color = Color(1, 0.5, 0.12)
 
 var _traveled: float = 0.0
@@ -144,7 +146,7 @@ func _explode() -> void:
 		var offset: Vector3 = enemy.global_position - global_position
 		offset.y = 0.0
 		if offset.length() <= skill.radius:
-			enemy.take_hit(player_stats.roll_skill(skill))
+			enemy.take_hit(player_stats.roll_skill(skill, skill_level))
 	sfx.play_at("hit", global_position, 2.0, 0.15)
 	Effects.fire_explosion(get_parent(), global_position, skill.radius)
 

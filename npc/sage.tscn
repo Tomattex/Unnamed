@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/trainer.gd" id="1_npc"]
+[ext_resource type="PackedScene" path="res://assets/characters/oad/characters/priest.glb" id="2_model"]
+[ext_resource type="Texture2D" path="res://assets/icons/game-icons/lorc/book-cover.svg" id="3_icon"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_npc"]
+radius = 70.0
+height = 360.0
+
+[node name="Sage" type="StaticBody3D" groups=["npcs"]]
+script = ExtResource("1_npc")
+display_name = "Sabio"
+idle_animation = "pray"
+map_icon = ExtResource("3_icon")
+map_icon_color = Color(0.55, 0.75, 1, 1)
+teaches = "saber"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 180, 0)
+shape = SubResource("CapsuleShape3D_npc")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(225, 0, 0, 0, 225, 0, 0, 0, 225, 0, 0, 0)
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 440, 0)
+layers = 2
+pixel_size = 0.0016
+billboard = 1
+no_depth_test = true
+fixed_size = true
+render_priority = 10
+outline_render_priority = 9
+modulate = Color(0.65, 0.85, 1, 1)
+outline_modulate = Color(0, 0, 0, 0.85)
+text = "Sabio"
+font_size = 30
+outline_size = 10

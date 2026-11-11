@@ -5,7 +5,7 @@ class_name Itemdata
 # Los valores nuevos van siempre al final para no romper los .tres existentes
 # (Godot guarda el enum como numero).
 enum ItemType { GENERIC, MELEE_WEAPON, SPECIAL, POTION, GOLD, GEM,
-	HELMET, CHEST, GLOVES, LEGS, BOOTS, BELT, RING, AMULET, SCROLL }
+	HELMET, CHEST, GLOVES, LEGS, BOOTS, BELT, RING, AMULET, SCROLL, RUNE }
 enum WeightClass { LIGHT, MEDIUM, HEAVY }
 enum Rarity { NORMAL, MAGIC, RARE, UNIQUE, SET }
 
@@ -87,6 +87,11 @@ const BONUS_COLOR := Color(0.5, 0.68, 1.0)
 @export var defense: int = 0
 ## Probabilidad de bloquear un golpe, en %.
 @export_range(0, 75) var block_chance: int = 0
+## Arma a dos manos: ocupa tambien la mano del escudo.
+@export var two_handed: bool = false
+## Arma a distancia que es un arco (y no una ballesta): otra animacion y otro
+## hueso del modelo.
+@export var bow: bool = false
 
 @export_group("Rareza")
 @export var rarity: Rarity = Rarity.NORMAL
@@ -115,6 +120,8 @@ const BONUS_COLOR := Color(0.5, 0.68, 1.0)
 @export var required_level: int = 0
 ## Atributo -> valor minimo (ej: {"fuerza": 14}).
 @export var required_attributes: Dictionary = {}
+## Solo la puede usar esta clase ("" = cualquiera). Ej: los arcos, la cazadora.
+@export var required_class: String = ""
 
 @export_group("Unicos")
 ## Efecto especial (clave de SPECIAL_TEXT) y cuanto da.
@@ -127,6 +134,10 @@ const BONUS_COLOR := Color(0.5, 0.68, 1.0)
 ## Que hace al usarlo: "" = cura vida (pocion comun), "antidoto",
 ## "res_fuego", "regeneracion" o "retorno" (ver player_stats.use_consumable).
 @export var use_effect: String = ""
+
+@export_group("Runas")
+## Habilidad que enseña o sube la runa (ruta del .tres de skills/).
+@export var rune_skill: String = ""
 
 @export_group("Comercio")
 ## Precio base en oro (para el comerciante, mas adelante).
@@ -196,12 +207,15 @@ func get_type_line() -> String:
 			return ("Arma " + FEMININE[rarity]).strip_edges()
 		ItemType.SPECIAL:
 			if has_damage():
-				return ("Arma a distancia " + FEMININE[rarity]).strip_edges()
+				return (("Arco " + MASCULINE[rarity]) if bow else ("Arma a distancia " + FEMININE[rarity])).strip_edges()
 			return ("Escudo " + MASCULINE[rarity]).strip_edges()
 		ItemType.POTION:
 			return "Poción"
 		ItemType.SCROLL:
 			return "Pergamino"
+		ItemType.RUNE:
+			var owner_class: String = rune_class()
+			return "Runa de %s" % PlayerClasses.name_of(owner_class) if not owner_class.is_empty() else "Runa"
 		ItemType.GOLD:
 			return "Oro"
 		ItemType.GEM:
@@ -250,6 +264,24 @@ func is_consumable() -> bool:
 	return item_type == ItemType.POTION or item_type == ItemType.SCROLL
 
 
+## Runas: se leen con doble clic y enseñan o suben una habilidad.
+func is_rune() -> bool:
+	return item_type == ItemType.RUNE and not rune_skill.is_empty()
+
+
+## Clase a la que pertenece la habilidad de la runa ("" si de ninguna).
+func rune_class() -> String:
+	for class_id in PlayerClasses.ORDER:
+		if rune_skill in PlayerClasses.get_info(class_id).skills:
+			return class_id
+	return ""
+
+
+## Arma que va en una mano (las de dos manos y las ballestas no).
+func is_one_handed_weapon() -> bool:
+	return item_type == ItemType.MELEE_WEAPON and not two_handed
+
+
 ## La pocion comun de vida (la de la tecla Q).
 func is_health_potion() -> bool:
 	return item_type == ItemType.POTION and use_effect.is_empty()
@@ -270,6 +302,8 @@ func get_requirement_lines() -> Array:
 	var lines: Array = []
 	var tree := Engine.get_main_loop() as SceneTree
 	var stats: Node = tree.root.get_node_or_null("player_stats") if tree else null
+	if not required_class.is_empty():
+		lines.append(["Solo para %s" % PlayerClasses.name_of(required_class), stats == null or stats.class_id == required_class])
 	if required_level > 0:
 		lines.append(["Requiere nivel %d" % required_level, stats == null or stats.level >= required_level])
 	for key in required_attributes:
@@ -301,12 +335,14 @@ func get_stats_lines() -> PackedStringArray:
 	if has_damage():
 		lines.append("Daño: %d - %d" % [min_damage, max_damage])
 		lines.append("Velocidad: %.2f golpes/s" % attack_speed)
+	if two_handed:
+		lines.append("A dos manos")
 	if defense > 0:
 		lines.append("Defensa: %d" % defense)
 	if block_chance > 0:
 		lines.append("Bloqueo: %d%%" % block_chance)
-	# El peso solo cuenta para combinar el arma con el escudo.
-	if item_type == ItemType.MELEE_WEAPON or item_type == ItemType.SPECIAL:
+	# El peso solo cuenta para combinar el arma con el escudo (o con otra arma).
+	if (item_type == ItemType.MELEE_WEAPON and not two_handed) or (item_type == ItemType.SPECIAL and not bow):
 		lines.append("Peso: %s" % WEIGHT_NAMES[weight_class])
 	return lines
 

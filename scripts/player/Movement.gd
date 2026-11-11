@@ -374,7 +374,7 @@ func use_skill(index: int) -> void:
 	if skill == null or player_stats.dead:
 		return
 	if not skill_book.is_unlocked(index):
-		_reject("Se aprende en el nivel %d" % skill.unlock_level)
+		_reject("Todavía no la aprendiste: leé su runa")
 		return
 	if not skill_book.is_ready(index):
 		_reject("Recargando...")

@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/rune_merchant.gd" id="1_npc"]
+[ext_resource type="PackedScene" path="res://assets/characters/oad/characters/hunter.glb" id="2_model"]
+[ext_resource type="Texture2D" path="res://assets/icons/game-icons/lorc/rune-stone.svg" id="3_icon"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_npc"]
+radius = 70.0
+height = 360.0
+
+[node name="RuneMerchant" type="StaticBody3D" groups=["npcs"]]
+script = ExtResource("1_npc")
+display_name = "Runista"
+idle_animation = "idle"
+map_icon = ExtResource("3_icon")
+map_icon_color = Color(0.75, 0.6, 1, 1)
+hide_props = PackedStringArray("WeaponR", "Quiver", "QuiverArrows")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 180, 0)
+shape = SubResource("CapsuleShape3D_npc")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(225, 0, 0, 0, 225, 0, 0, 0, 225, 0, 0, 0)
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 440, 0)
+layers = 2
+pixel_size = 0.0016
+billboard = 1
+no_depth_test = true
+fixed_size = true
+render_priority = 10
+outline_render_priority = 9
+modulate = Color(0.8, 0.7, 1, 1)
+outline_modulate = Color(0, 0, 0, 0.85)
+text = "Runista"
+font_size = 30
+outline_size = 10

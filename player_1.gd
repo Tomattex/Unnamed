@@ -5,7 +5,8 @@ extends Node3D
 ## cargar la escena; las armas y escudos equipados los pone weapon_hand.gd.
 ## Animaciones: quieto, correr (sincronizado con la velocidad), ataque,
 ## habilidades (SkillData.animation es una clave que cada clase traduce a un
-## clip), montado y muerte.
+## clip), montado y muerte. Con un arma a dos manos, un arco o dos armas el
+## quieto, el correr y los ataques cambian (PlayerClasses.WEAPON_ANIMS).
 
 const LIBRARY := preload("res://assets/characters/oad/oad_anim_library.glb")
 ## Los personajes de 0 A.D. miden 1,8 m; a esta escala quedan del alto del mundo.
@@ -25,6 +26,8 @@ var model: Node3D
 var anim_player: AnimationPlayer
 var skeleton: Skeleton3D
 var anims: Dictionary = {}
+## Las de la clase, sin lo del arma.
+var _class_anims: Dictionary = {}
 var attack_index: int = 0
 ## Animacion de ataque o habilidad en curso (para saber cuando termina).
 var action_animation: String = ""
@@ -39,6 +42,8 @@ func _ready() -> void:
 	combat.skill_animation.connect(_on_skill_animation)
 	player_stats.died.connect(_on_died)
 	player_stats.respawned.connect(_on_respawned)
+	inventory_data.equipment_changed.connect(func(_index: int) -> void: _refresh_weapon_anims())
+	_refresh_weapon_anims()
 	var trail := WeaponTrail.new()
 	trail.name = "Estela"
 	add_child(trail)
@@ -47,7 +52,8 @@ func _ready() -> void:
 
 func _build_model() -> void:
 	var info: Dictionary = PlayerClasses.get_info(player_stats.class_id)
-	anims = info.anims
+	_class_anims = info.anims
+	anims = _class_anims
 	model = load(info.model).instantiate()
 	model.name = "Modelo"
 	model.scale = Vector3.ONE * MODEL_SCALE
@@ -66,6 +72,26 @@ func _build_model() -> void:
 	library_scene.free()
 	for anim_name in [anims.idle, anims.run, anims.ride_idle, anims.ride_move]:
 		_set_loop(anim_name, Animation.LOOP_LINEAR)
+
+
+## Elige las animaciones segun el arma: a dos manos, arco, dos armas o las
+## de la clase.
+func _refresh_weapon_anims() -> void:
+	var kind: String = ""
+	var weapon: Itemdata = player_stats.get_weapon()
+	if weapon and weapon.bow:
+		kind = "bow"
+	elif weapon and weapon.two_handed:
+		kind = "two_handed"
+	elif player_stats.is_dual_wielding():
+		kind = "dual"
+	anims = _class_anims.duplicate()
+	if not kind.is_empty():
+		anims.merge(PlayerClasses.WEAPON_ANIMS[kind], true)
+	for anim_name in [anims.idle, anims.run]:
+		_set_loop(anim_name, Animation.LOOP_LINEAR)
+	if not attacking and anim_player:
+		_play_base()
 
 
 ## Posicion global de un hueso del modelo. El retrato del HUD sigue la cabeza

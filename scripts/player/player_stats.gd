@@ -15,6 +15,8 @@ signal potion_used(amount: float)
 signal consumable_used(item: Itemdata)
 signal died
 signal respawned
+## Cambiaron las pasivas o sus puntos (ver scripts/player/passives.gd).
+signal passives_changed
 ## Daño de veneno o quemadura que acaba de restar (para el texto flotante).
 signal dot_damaged(amount: float, type: int)
 
@@ -47,6 +49,8 @@ const FIRE_POTION_RESIST: float = 40.0
 const FIRE_POTION_DURATION: float = 60.0
 const REGEN_POTION_SHARE: float = 0.4
 const REGEN_POTION_DURATION: float = 12.0
+## Con dos armas se pega mas rapido (sobre el promedio de las dos).
+const DUAL_ATTACK_SPEED: float = 1.15
 ## Efectos de los unicos: radio del aura de fuego y cada cuanto quema.
 const FIRE_AURA_RADIUS: float = 330.0
 const FIRE_AURA_TICK: float = 0.5
@@ -70,6 +74,12 @@ var dead: bool = false
 var buffs: Dictionary = {}
 ## Veneno y quemadura que tiene encima el personaje.
 var status := StatusEffects.new()
+## Pasivas aprendidas: id -> nivel (ver Passives).
+var passives: Dictionary = {}
+## Puntos para subir pasivas (uno por nivel del personaje).
+var passive_points: int = 0
+## El proximo ataque basico con dos armas sale con la mano izquierda.
+var offhand_swing: bool = false
 var _potion_timer: float = 0.0
 var _aura_timer: float = 0.0
 
@@ -91,6 +101,9 @@ func reset(new_class: String = class_id) -> void:
 	attributes = PlayerClasses.get_info(class_id).attributes.duplicate()
 	buffs.clear()
 	status.clear()
+	passives.clear()
+	passive_points = 0
+	offhand_swing = false
 	dead = false
 	_potion_timer = 0.0
 	health = get_max_health()
@@ -274,11 +287,13 @@ func add_xp(amount: int) -> void:
 		xp -= xp_for_next_level()
 		level += 1
 		unspent_points += ATTRIBUTE_POINTS_PER_LEVEL
+		passive_points += 1
 		# Subir de nivel cura por completo.
 		health = get_max_health()
 		health_changed.emit(health, get_max_health())
 		leveled_up.emit(level)
 		stats_changed.emit()
+		passives_changed.emit()
 	xp_changed.emit(xp, xp_for_next_level())
 
 
@@ -293,6 +308,77 @@ func spend_point(attribute: String) -> bool:
 	health_changed.emit(health, get_max_health())
 	stats_changed.emit()
 	return true
+
+
+# --- Pasivas ----------------------------------------------------------------
+
+func passive_level(id: String) -> int:
+	return int(passives.get(id, 0))
+
+
+## Efecto total de una pasiva, como fraccion (0.12 = 12 %).
+func passive_bonus(id: String) -> float:
+	return Passives.effect(id, passive_level(id)) / 100.0
+
+
+## Lugares para pasivas que todavia no se usaron.
+func free_passive_slots() -> int:
+	return maxi(Passives.slots_for_level(level) - passives.size(), 0)
+
+
+## Elige una pasiva nueva (nivel 1). Devuelve el motivo si no se pudo ("" si si).
+func learn_passive(id: String) -> String:
+	if not Passives.LIST.has(id) or id not in Passives.available_for(class_id):
+		return "Tu clase no la puede aprender"
+	if passives.has(id):
+		return "Ya la tenés"
+	if free_passive_slots() <= 0:
+		var next: int = Passives.next_slot_level(level)
+		return "La próxima se elige en el nivel %d" % next if next > 0 else "Ya tenés todas las que se pueden"
+	passives[id] = 1
+	passives_changed.emit()
+	stats_changed.emit()
+	return ""
+
+
+## Motivo por el que no se puede subir una pasiva ("" si se puede).
+func passive_raise_problem(id: String) -> String:
+	var current: int = passive_level(id)
+	if current <= 0:
+		return "Primero hay que aprenderla"
+	if current >= Passives.MAX_LEVEL:
+		return "Ya está al máximo"
+	if current >= level:
+		return "No puede pasar tu nivel (%d)" % level
+	return ""
+
+
+## Sube una pasiva un nivel con un punto (o pagado por un entrenador).
+func raise_passive(id: String, with_point: bool = true) -> String:
+	var problem: String = passive_raise_problem(id)
+	if not problem.is_empty():
+		return problem
+	if with_point:
+		if passive_points <= 0:
+			return "No tenés puntos"
+		passive_points -= 1
+	passives[id] = passive_level(id) + 1
+	var old_max: float = get_max_health()
+	health += maxf(get_max_health() - old_max, 0.0)
+	health_changed.emit(health, get_max_health())
+	passives_changed.emit()
+	stats_changed.emit()
+	return ""
+
+
+## Lo que descuenta Comercio a lo que compra y suma a lo que vende (fraccion).
+func get_trade_bonus() -> float:
+	return passive_bonus("comercio")
+
+
+## Velocidad a caballo (Equitacion).
+func get_riding_multiplier() -> float:
+	return 1.0 + passive_bonus("equitacion")
 
 
 # --- Stats derivados -------------------------------------------------------
@@ -320,21 +406,51 @@ func get_special(key: String) -> float:
 
 
 func get_max_health() -> float:
-	return BASE_HEALTH + get_attribute("vitalidad") * HEALTH_PER_VITALITY 			+ (level - 1) * HEALTH_PER_LEVEL + get_equipment_bonus("vida")
+	return (BASE_HEALTH + get_attribute("vitalidad") * HEALTH_PER_VITALITY \
+		+ (level - 1) * HEALTH_PER_LEVEL + get_equipment_bonus("vida")) * (1.0 + passive_bonus("constitucion"))
 
 
 func get_health_regen() -> float:
 	return get_attribute("vitalidad") * REGEN_PER_VITALITY + get_equipment_bonus("regeneracion") + _buff_sum("regen")
 
 
-## Arma con la que se ataca: si hay una ballesta equipada tiene prioridad
-## (ataque a distancia); si no, el arma cuerpo a cuerpo.
+## Arma con la que se ataca: si hay una ballesta o un arco equipado tiene
+## prioridad (ataque a distancia); si no, el arma cuerpo a cuerpo. Con dos
+## armas, mientras offhand_swing esta prendido es la de la mano izquierda.
 func get_weapon() -> Itemdata:
 	var special: Itemdata = inventory_data.get_equipped(inventory_data.SPECIAL_EQUIP)
 	if special and special.is_ranged():
 		return special
+	if offhand_swing and is_dual_wielding():
+		return special
 	var weapon: Itemdata = inventory_data.get_equipped(inventory_data.MELEE_EQUIP)
 	return weapon if weapon and weapon.has_damage() else null
+
+
+## Arma de la mano izquierda (con dos armas; null si hay escudo o nada).
+func get_offhand() -> Itemdata:
+	var special: Itemdata = inventory_data.get_equipped(inventory_data.SPECIAL_EQUIP)
+	return special if special and special.item_type == Itemdata.ItemType.MELEE_WEAPON else null
+
+
+func is_dual_wielding() -> bool:
+	var main: Itemdata = inventory_data.get_equipped(inventory_data.MELEE_EQUIP)
+	return main != null and main.has_damage() and get_offhand() != null
+
+
+## La clase puede llevar un arma en cada mano.
+func can_dual_wield() -> bool:
+	return PlayerClasses.get_info(class_id).get("dual_wield", false)
+
+
+## Lo que suman las pasivas de armas al daño del arma que se usa.
+func _weapon_passive_bonus() -> float:
+	var weapon: Itemdata = get_weapon()
+	if weapon == null:
+		return 0.0
+	if weapon.is_ranged():
+		return passive_bonus("tiro")
+	return passive_bonus("manejo_armas") + (passive_bonus("dos_manos") if weapon.two_handed else 0.0)
 
 
 func is_ranged() -> bool:
@@ -348,12 +464,14 @@ func uses_spell_attack() -> bool:
 
 
 func get_damage_multiplier() -> float:
-	return (1.0 + get_attribute("fuerza") * 0.02 + get_equipment_bonus("daño_pct") / 100.0) 			* _buff_product("damage_mult")
+	return (1.0 + get_attribute("fuerza") * 0.02 + get_equipment_bonus("daño_pct") / 100.0 + _weapon_passive_bonus()) \
+		* _buff_product("damage_mult")
 
 
 ## Multiplicador del daño magico, de veneno y de fuego (Concentracion en vez de Fuerza).
 func get_elemental_multiplier() -> float:
-	return (1.0 + get_attribute("concentracion") * ELEMENTAL_PER_CONCENTRATION 			+ get_equipment_bonus("daño_pct") / 100.0) * _buff_product("damage_mult")
+	return (1.0 + get_attribute("concentracion") * ELEMENTAL_PER_CONCENTRATION \
+		+ get_equipment_bonus("daño_pct") / 100.0 + passive_bonus("saber_arcano")) * _buff_product("damage_mult")
 
 
 ## Daño extra de un tipo que suma el equipo en cada golpe (sin la variacion de la tirada).
@@ -368,7 +486,8 @@ func get_elemental_damage(type: int) -> float:
 func get_resistance(type: int) -> float:
 	if type == Damage.Type.PHYSICAL:
 		return (1.0 - Damage.armor_multiplier(get_defense())) * 100.0
-	return minf(get_equipment_bonus(Damage.resist_key(type)) + _buff_sum("resist") + _buff_sum(Damage.resist_key(type)), Damage.RESIST_CAP)
+	return minf(get_equipment_bonus(Damage.resist_key(type)) + _buff_sum("resist") + _buff_sum(Damage.resist_key(type)) \
+		+ Passives.effect("resistencia", passive_level("resistencia")), Damage.RESIST_CAP)
 
 
 ## Daño base de los hechizos (sin la Concentracion ni la habilidad).
@@ -392,11 +511,17 @@ func get_max_damage() -> int:
 	return maxi(get_min_damage(), roundi(base * get_damage_multiplier()))
 
 
-## Ataques por segundo.
+## Ataques por segundo. Con dos armas, el promedio de las dos un poco mas rapido.
 func get_attack_speed() -> float:
 	var weapon: Itemdata = get_weapon()
 	var base: float = weapon.attack_speed if weapon else (SPELL_ATTACK_SPEED if uses_spell_attack() else UNARMED_ATTACK_SPEED)
-	return base * (1.0 + get_attribute("destreza") * 0.01 + get_equipment_bonus("velocidad_pct") / 100.0) 			* _buff_product("attack_speed_mult")
+	var passive: float = passive_bonus("ataque")
+	if is_dual_wielding() and not get_weapon().is_ranged():
+		var main: Itemdata = inventory_data.get_equipped(inventory_data.MELEE_EQUIP)
+		base = (main.attack_speed + get_offhand().attack_speed) / 2.0 * DUAL_ATTACK_SPEED
+		passive += passive_bonus("dos_armas")
+	return base * (1.0 + get_attribute("destreza") * 0.01 + get_equipment_bonus("velocidad_pct") / 100.0 + passive) \
+		* _buff_product("attack_speed_mult")
 
 
 func get_crit_chance() -> float:
@@ -407,7 +532,7 @@ func get_defense() -> int:
 	var total: float = get_attribute("vitalidad") * 0.5 + _buff_sum("defense") + get_equipment_bonus("defensa")
 	for item in inventory_data.get_equipped_items():
 		total += item.defense
-	return roundi(total)
+	return roundi(total * (1.0 + passive_bonus("defensa")))
 
 
 func get_block_chance() -> float:
@@ -419,6 +544,11 @@ func get_block_chance() -> float:
 ## elemental del equipo), para la hoja de personaje.
 func get_dps() -> float:
 	var hit: float = (get_min_damage() + get_max_damage()) / 2.0
+	# Con dos armas los golpes se alternan: cuenta el promedio de las dos manos.
+	if is_dual_wielding() and not get_weapon().is_ranged():
+		offhand_swing = true
+		hit = (hit + (get_min_damage() + get_max_damage()) / 2.0) / 2.0
+		offhand_swing = false
 	for type in Damage.ELEMENTS:
 		hit += get_elemental_damage(type)
 	var crit: float = clampf(get_crit_chance(), 0.0, 100.0) / 100.0
@@ -427,7 +557,7 @@ func get_dps() -> float:
 
 ## Multiplicador del tiempo de recarga de habilidades (menos es mejor).
 func get_cooldown_multiplier() -> float:
-	return 100.0 / (100.0 + get_attribute("concentracion") * 3.0)
+	return 100.0 / (100.0 + get_attribute("concentracion") * 3.0) * (1.0 - passive_bonus("concentracion"))
 
 
 # --- Combate ---------------------------------------------------------------
@@ -462,18 +592,23 @@ func roll_spell(multiplier: float, type: int) -> Dictionary:
 	return {"parts": parts, "crit": crit, "player": true}
 
 
-## Tirada de una habilidad: hechizo o golpe con el arma, segun la habilidad.
-func roll_skill(skill: SkillData) -> Dictionary:
+## Tirada de una habilidad a su nivel: hechizo o golpe con el arma.
+func roll_skill(skill: SkillData, skill_level: int = 1) -> Dictionary:
+	var multiplier: float = skill.damage_at(skill_level)
 	if skill.spell:
-		return roll_spell(skill.damage_multiplier, skill.damage_type)
-	return roll_hit(skill.damage_multiplier, skill.damage_type, skill.damage_conversion)
+		return roll_spell(multiplier, skill.damage_type)
+	return roll_hit(multiplier, skill.damage_type, skill.damage_conversion)
 
 
-## Golpe del ataque basico (el mago sin arma tira un rayo arcano).
-func roll_basic_attack() -> Dictionary:
+## Golpe del ataque basico (el mago sin arma tira un rayo arcano). Con dos
+## armas, offhand pega con la de la mano izquierda.
+func roll_basic_attack(offhand: bool = false) -> Dictionary:
 	if uses_spell_attack():
 		return roll_spell(SPELL_ATTACK_MULTIPLIER, Damage.Type.MAGIC)
-	return roll_hit()
+	offhand_swing = offhand and is_dual_wielding()
+	var hit: Dictionary = roll_hit()
+	offhand_swing = false
+	return hit
 
 
 func get_resistances() -> Dictionary:

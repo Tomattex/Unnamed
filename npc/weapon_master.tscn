@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/npc/trainer.gd" id="1_npc"]
+[ext_resource type="PackedScene" path="res://assets/characters/oad/characters/warrior.glb" id="2_model"]
+[ext_resource type="Texture2D" path="res://assets/icons/game-icons/delapouite/teacher.svg" id="3_icon"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_npc"]
+radius = 70.0
+height = 360.0
+
+[node name="WeaponMaster" type="StaticBody3D" groups=["npcs"]]
+script = ExtResource("1_npc")
+display_name = "Maestro de armas"
+idle_animation = "idle_combat"
+map_icon = ExtResource("3_icon")
+map_icon_color = Color(1, 0.6, 0.35, 1)
+teaches = "armas"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 180, 0)
+shape = SubResource("CapsuleShape3D_npc")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(225, 0, 0, 0, 225, 0, 0, 0, 225, 0, 0, 0)
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 440, 0)
+layers = 2
+pixel_size = 0.0016
+billboard = 1
+no_depth_test = true
+fixed_size = true
+render_priority = 10
+outline_render_priority = 9
+modulate = Color(1, 0.75, 0.5, 1)
+outline_modulate = Color(0, 0, 0, 0.85)
+text = "Maestro de armas"
+font_size = 30
+outline_size = 10

@@ -55,6 +55,17 @@ inventario usan "visored-helm", "breastplate", "boots", "gem-pendant",
 "broadsword" y "checked-shield" de Lorc, y "gauntlet", "leg-armor",
 "belt-armor" y "ring" de Delapouite.
 
+Las runas (`ui/icons/runes/`) son el dibujo de su habilidad sobre una piedra
+propia. Los íconos de las pasivas (`ui/icons/passives/`) son, recoloreados
+sobre un fondo propio: Manejo de armas (Lorc, sword-clash), Ataque (Lorc,
+fist), Defensa (Lorc, checked-shield), Armas a dos manos (Lorc, battle-axe),
+Combate con dos armas (Lorc, crossed-swords), Tiro (Lorc, high-shot),
+Constitución (Lorc, muscle-up), Concentración (Lorc, meditation), Saber arcano
+(Lorc, magic-swirl), Resistencia (Lorc, shield-reflect), Comercio (Lorc,
+swap-bag) y Equitación (Delapouite, horse-head). Los arcos usan "high-shot" de
+Lorc, y en el mapa grande el Maestro de armas es "teacher" de Delapouite, el
+Sabio "book-cover" de Lorc y la Runista "rune-stone" de Lorc.
+
 Las gemas (`item/gems/`) no usan arte de afuera: su talla y sus materiales los
 genera `item/gems/build_gems.gd`.
 

@@ -29,6 +29,8 @@ static func build(item: Itemdata, quantity: int = 1, hint: String = "", compare:
 		title += " x%d" % quantity
 	_add(box, title, item.get_rarity_color(), 18)
 	_add(box, item.get_type_line(), DIM_COLOR, 13)
+	if item.is_rune():
+		_add_rune_info(box, item)
 
 	var stats: PackedStringArray = item.get_stats_lines()
 	if not stats.is_empty():
@@ -85,6 +87,31 @@ static func build(item: Itemdata, quantity: int = 1, hint: String = "", compare:
 	return box
 
 
+# Que hace la runa con el personaje: aprende la habilidad o la sube (con lo
+# que cambia), o avisa que es de otra clase.
+static func _add_rune_info(box: VBoxContainer, item: Itemdata) -> void:
+	_add_separator(box)
+	var index: int = skill_book.rune_index(item)
+	if index < 0:
+		var other: Label = _add(box, "Es de otra clase: cambiala en el comerciante de runas de la aldea.", MISSING_COLOR, 13)
+		other.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		return
+	var skill: SkillData = skill_book.get_skill(index)
+	var level: int = skill_book.get_level(index)
+	if level <= 0:
+		_add(box, "Aprendés %s (tecla %d)" % [skill.name, index + 1], BETTER_COLOR, 14)
+		for line in skill.compare_lines(1, 1):
+			_add(box, line, STAT_COLOR, 13)
+	else:
+		_add(box, "%s: nivel %d → %d" % [skill.name, level, level + 1], BETTER_COLOR, 14)
+		for line in skill.compare_lines(level, level + 1):
+			_add(box, line, STAT_COLOR, 13)
+	var problem: String = skill_book.rune_problem(item)
+	if not problem.is_empty():
+		var blocked: Label = _add(box, problem, MISSING_COLOR, 13)
+		blocked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
 # Una linea por ranura: la gema con lo que da, o vacia.
 static func _add_sockets(box: VBoxContainer, item: Itemdata) -> void:
 	_add_separator(box)
@@ -137,6 +164,15 @@ static func _add_comparison(box: VBoxContainer, item: Itemdata) -> void:
 	if current == item:
 		return
 	_add_separator(box)
+	# Un arma a dos manos saca lo de la otra mano (y lo de la otra mano, a ella).
+	var other_hand: Itemdata = null
+	if equip_index == inventory_data.MELEE_EQUIP and item.two_handed:
+		other_hand = inventory_data.get_equipped(inventory_data.SPECIAL_EQUIP)
+	elif equip_index == inventory_data.SPECIAL_EQUIP:
+		var main: Itemdata = inventory_data.get_equipped(inventory_data.MELEE_EQUIP)
+		other_hand = main if main and main.two_handed else null
+	if other_hand:
+		_add(box, "Deja libre la otra mano: %s" % other_hand.name, WORSE_COLOR, 13)
 	if current == null:
 		_add(box, "No tenés nada equipado ahí", DIM_COLOR, 13)
 		return

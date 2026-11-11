@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="Itemdata" format=3]
+
+[ext_resource type="Script" uid="uid://buopyt3nqybl3" path="res://item/item_data.gd" id="1_item"]
+[ext_resource type="Texture2D" path="res://assets/icons/game-icons/lorc/high-shot.svg" id="2_icon"]
+[ext_resource type="PackedScene" path="res://item/models/arco_de_guerra.tscn" id="3_mod"]
+
+[resource]
+script = ExtResource("1_item")
+name = "Arco de guerra"
+description = "Un arco de cuerno y tendón, duro de tensar."
+grid_size = Vector2i(1, 4)
+item_type = 2
+texture = ExtResource("2_icon")
+model_3d = ExtResource("3_mod")
+weight_class = 2
+min_damage = 10
+max_damage = 18
+attack_speed = 0.95
+two_handed = false
+bow = true
+required_attributes = {
+"destreza": 18
+}
+required_class = "cazadora"
+value = 150
+metadata/_custom_type_script = "uid://buopyt3nqybl3"

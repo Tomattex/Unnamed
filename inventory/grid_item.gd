@@ -80,6 +80,8 @@ func _make_custom_tooltip(_for_text: String) -> Object:
 	var hint: String = "Clic: agarrar · Clic derecho: " + right_click
 	if slot.item_data.is_equipment():
 		hint = "Clic: agarrar · Doble clic: equipar · Clic derecho: " + right_click
+	elif slot.item_data.is_rune():
+		hint = "Doble clic: leer la runa · Clic derecho: " + right_click
 	elif slot.item_data.is_health_potion():
 		hint = "Doble clic o Q: beber · Clic derecho: " + right_click
 	elif slot.item_data.is_consumable():

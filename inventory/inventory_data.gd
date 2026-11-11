@@ -13,6 +13,10 @@ extends Node
 ## herrero (ui/smith_panel.gd); vuelve a la mochila al cerrar el panel.
 ## belt: el cinturon de consumibles del HUD (teclas W, E, R y T); cada ranura
 ## guarda que consumible usa, y la cantidad sale de la mochila.
+## Manos: un arma a dos manos ocupa las dos (al ponerla, lo de la otra mano
+## vuelve a la mochila, y al revés). Las clases que pueden pelear con dos
+## armas (PlayerClasses "dual_wield") llevan un arma de una mano en el lugar
+## del escudo.
 
 signal inventory_changed(slot_index: int)
 signal stash_changed
@@ -46,7 +50,7 @@ const EQUIP_COUNT: int = 11
 const SORT_ORDER := [Itemdata.ItemType.MELEE_WEAPON, Itemdata.ItemType.SPECIAL, Itemdata.ItemType.HELMET,
 		Itemdata.ItemType.CHEST, Itemdata.ItemType.GLOVES, Itemdata.ItemType.LEGS, Itemdata.ItemType.BOOTS,
 		Itemdata.ItemType.BELT, Itemdata.ItemType.RING, Itemdata.ItemType.AMULET, Itemdata.ItemType.GEM,
-		Itemdata.ItemType.POTION, Itemdata.ItemType.SCROLL, Itemdata.ItemType.GOLD, Itemdata.ItemType.GENERIC]
+		Itemdata.ItemType.RUNE, Itemdata.ItemType.POTION, Itemdata.ItemType.SCROLL, Itemdata.ItemType.GOLD, Itemdata.ItemType.GENERIC]
 ## Ranuras del cinturon y lo que llevan al empezar (la pocion de vida va en la Q).
 const BELT_SIZE: int = 4
 const DEFAULT_BELT := ["res://item/items/antidoto.tres", "res://item/items/pocion_fuego.tres",
@@ -348,7 +352,8 @@ func belt_item(index: int) -> Itemdata:
 ## Pone un consumible en la ranura (si ya estaba en otra, se cambian de lugar).
 ## Solo van consumibles del juego (no generados), menos la pocion de vida.
 func set_belt(index: int, item: Itemdata) -> bool:
-	if index < 0 or index >= BELT_SIZE or item == null or not item.is_consumable() 			or item.is_health_potion() or item.resource_path.is_empty():
+	if index < 0 or index >= BELT_SIZE or item == null or not item.is_consumable() \
+		or item.is_health_potion() or item.resource_path.is_empty():
 		return false
 	var previous: int = belt.find(item.resource_path)
 	if previous >= 0:
@@ -447,11 +452,54 @@ func equip_index_for(item: Itemdata) -> int:
 			return -1
 
 
-## Si el item puede ir en ese slot (un anillo entra en cualquiera de los dos).
+## Si el item puede ir en ese slot (un anillo entra en cualquiera de los dos;
+## un arma de una mano, tambien en el del escudo si la clase usa dos armas).
 func fits_slot(item: Itemdata, equip_index: int) -> bool:
 	if item.item_type == Itemdata.ItemType.RING:
 		return equip_index == RING_EQUIP or equip_index == RING2_EQUIP
+	if equip_index == SPECIAL_EQUIP and item.is_one_handed_weapon():
+		return player_stats.can_dual_wield()
 	return equip_index_for(item) == equip_index
+
+
+# Donde va un arma con doble clic: con un arma de una mano ya en la derecha y
+# la izquierda libre, a la izquierda (si la clase usa dos armas).
+func _double_click_index(item: Itemdata) -> int:
+	var index: int = equip_index_for(item)
+	if index == MELEE_EQUIP and item.is_one_handed_weapon() and player_stats.can_dual_wield():
+		var main: Itemdata = get_equipped(MELEE_EQUIP)
+		if main and main.is_one_handed_weapon() and equipment[SPECIAL_EQUIP] == null:
+			return SPECIAL_EQUIP
+	return index
+
+
+# La otra mano que hay que vaciar para poner item en equip_index (-1 si
+# ninguna): un arma a dos manos necesita la izquierda libre, y cualquier cosa
+# en la izquierda saca un arma a dos manos de la derecha.
+func _hand_to_free(item: Itemdata, equip_index: int) -> int:
+	if equip_index == MELEE_EQUIP and item.two_handed and equipment[SPECIAL_EQUIP] != null:
+		return SPECIAL_EQUIP
+	if equip_index == SPECIAL_EQUIP:
+		var main: Itemdata = get_equipped(MELEE_EQUIP)
+		if main and main.two_handed:
+			return MELEE_EQUIP
+	return -1
+
+
+# Manda a la mochila lo de esa mano (para hacer lugar a un arma a dos manos).
+# Devuelve false si no entra.
+func _free_hand(equip_index: int) -> bool:
+	if equip_index < 0:
+		return true
+	var slot: Slotdata = equipment[equip_index]
+	var pos: Vector2i = backpack.find_free_position(slot.item_data)
+	if pos.x < 0:
+		equip_rejected.emit("No hay lugar en el inventario para lo de la otra mano")
+		return false
+	equipment[equip_index] = null
+	backpack.insert(slot, pos)
+	equipment_changed.emit(equip_index)
+	return true
 
 
 ## Todo lo equipado (sin los slots vacios).
@@ -477,7 +525,7 @@ func equip_from_slot(slot_index: int) -> bool:
 	if slot_index < 0 or slot_index >= backpack.slots.size():
 		return false
 	var slot: Slotdata = backpack.slots[slot_index]
-	var equip_index: int = equip_index_for(slot.item_data)
+	var equip_index: int = _double_click_index(slot.item_data)
 	if equip_index == -1:
 		return false  # este item no es equipable (pociones, oro, etc.)
 	var problem: String = _requirement_problem(slot.item_data)
@@ -493,6 +541,11 @@ func equip_from_slot(slot_index: int) -> bool:
 	if previous and not backpack.restore_slot(previous, slot.grid_pos):
 		backpack.insert(slot, slot.grid_pos)
 		equip_rejected.emit("No hay lugar en el inventario")
+		return false
+	if not _free_hand(_hand_to_free(slot.item_data, equip_index)):
+		if previous:
+			backpack.slots.erase(previous)
+		backpack.insert(slot, slot.grid_pos)
 		return false
 	equipment[equip_index] = slot
 	inventory_changed.emit(-1)
@@ -526,6 +579,8 @@ func on_equipment_clicked(equip_index: int) -> void:
 	if not _combo_allowed(held.item_data, equip_index):
 		equip_rejected.emit("Muy pesado para combinarlo con lo que llevás")
 		return
+	if not _free_hand(_hand_to_free(held.item_data, equip_index)):
+		return
 	var previous: Slotdata = equipment[equip_index]
 	equipment[equip_index] = held
 	held = previous
@@ -551,13 +606,14 @@ func get_equipped(equip_index: int) -> Itemdata:
 
 # Combina el item nuevo con lo ya equipado en el otro slot y valida la regla
 # de peso: un item pesado solo se combina con uno ligero (ej: espada larga +
-# escudo ligero, o escudo pesado + espada ligera). La armadura no cuenta.
+# escudo ligero, o escudo pesado + espada ligera). La armadura no cuenta, y
+# con un arma a dos manos (o un arco) la otra mano se vacia igual.
 func _combo_allowed(item: Itemdata, equip_index: int) -> bool:
 	if equip_index != MELEE_EQUIP and equip_index != SPECIAL_EQUIP:
 		return true
 	var other_index: int = SPECIAL_EQUIP if equip_index == MELEE_EQUIP else MELEE_EQUIP
 	var other: Itemdata = get_equipped(other_index)
-	if other == null:
+	if other == null or item.two_handed or other.two_handed or item.bow or other.bow:
 		return true
 	if item.weight_class == Itemdata.WeightClass.HEAVY:
 		return other.weight_class == Itemdata.WeightClass.LIGHT

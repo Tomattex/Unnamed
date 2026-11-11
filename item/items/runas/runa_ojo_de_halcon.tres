@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Itemdata" format=3]
+
+[ext_resource type="Script" uid="uid://buopyt3nqybl3" path="res://item/item_data.gd" id="1_item"]
+[ext_resource type="Texture2D" path="res://ui/icons/runes/ojo_de_halcon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item")
+name = "Runa: Ojo de Halcón"
+description = "Leela (doble clic) para aprender Ojo de Halcón o subirla un nivel."
+stackable = true
+item_type = 15
+texture = ExtResource("2_icon")
+rune_skill = "res://skills/ojo_de_halcon.tres"
+value = 80
+metadata/_custom_type_script = "uid://buopyt3nqybl3"

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="Itemdata" format=3]
+
+[ext_resource type="Script" uid="uid://buopyt3nqybl3" path="res://item/item_data.gd" id="1_item"]
+[ext_resource type="Texture2D" path="res://assets/icons/game-icons/lorc/battle-axe.svg" id="2_icon"]
+[ext_resource type="PackedScene" path="res://item/models/hacha_de_guerra.tscn" id="3_mod"]
+
+[resource]
+script = ExtResource("1_item")
+name = "Hacha de guerra"
+description = "A dos manos. Lenta y terrible: parte escudos y huesos por igual."
+grid_size = Vector2i(2, 4)
+item_type = 1
+texture = ExtResource("2_icon")
+model_3d = ExtResource("3_mod")
+weight_class = 2
+min_damage = 20
+max_damage = 42
+attack_speed = 0.66
+two_handed = true
+bow = false
+required_attributes = {
+"fuerza": 20
+}
+required_class = ""
+value = 170
+metadata/_custom_type_script = "uid://buopyt3nqybl3"

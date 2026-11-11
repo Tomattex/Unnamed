@@ -4,7 +4,8 @@ extends Node3D
 ## glow es un virote con magia (o el rayo arcano del mago): brilla con ese
 ## color y deja una estela. harmless = solo se ve (la lluvia de virotes hace el
 ## daño aparte). hits_player = la tiro un enemigo (los bandidos arqueros): daña
-## al jugador y no a los enemigos.
+## al jugador y no a los enemigos. arrow = flecha de arco: mas larga y fina,
+## con plumas.
 
 const HIT_RADIUS: float = 40.0
 ## Ancho del jugador para las flechas enemigas.
@@ -18,6 +19,7 @@ var hit: Dictionary = {}
 var glow: Color = Color.TRANSPARENT
 var harmless: bool = false
 var hits_player: bool = false
+var arrow: bool = false
 
 var _traveled: float = 0.0
 
@@ -26,7 +28,7 @@ func _ready() -> void:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(0.45, 0.32, 0.18)
 	var shaft := BoxMesh.new()
-	shaft.size = Vector3(10.0, 10.0, 130.0)
+	shaft.size = Vector3(6.0, 6.0, 170.0) if arrow else Vector3(10.0, 10.0, 130.0)
 	shaft.material = material
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = shaft
@@ -40,8 +42,22 @@ func _ready() -> void:
 	tip.material = tip_material
 	var tip_mesh := MeshInstance3D.new()
 	tip_mesh.mesh = tip
-	tip_mesh.position.z = 74.0
+	tip_mesh.position.z = 94.0 if arrow else 74.0
 	add_child(tip_mesh)
+	if arrow:
+		tip.size = Vector3(12.0, 4.0, 22.0)
+		# Plumas: dos aletas cruzadas atras.
+		var feather_material := StandardMaterial3D.new()
+		feather_material.albedo_color = Color(0.85, 0.82, 0.74)
+		for angle in [0.0, PI * 0.5]:
+			var feather := BoxMesh.new()
+			feather.size = Vector3(22.0, 1.5, 34.0)
+			feather.material = feather_material
+			var feather_mesh := MeshInstance3D.new()
+			feather_mesh.mesh = feather
+			feather_mesh.position.z = -72.0
+			feather_mesh.rotation.z = angle
+			add_child(feather_mesh)
 
 	if glow.a > 0.0:
 		var light := StandardMaterial3D.new()

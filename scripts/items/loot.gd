@@ -24,11 +24,17 @@ const BASE_ITEMS := [
 	"res://item/items/long_sword.tres",
 	"res://item/items/hacha_grande.tres",
 	"res://item/items/martillo_grande.tres",
+	"res://item/items/mandoble.tres",
+	"res://item/items/hacha_de_guerra.tres",
+	"res://item/items/maza_de_guerra.tres",
 	"res://item/items/escudo_ligero.tres",
 	"res://item/items/escudo_mid.tres",
 	"res://item/items/escudo_pesado.tres",
 	"res://item/items/ballesta_de_madera.tres",
 	"res://item/items/ballesta_pesada.tres",
+	"res://item/items/arco_corto.tres",
+	"res://item/items/arco_largo.tres",
+	"res://item/items/arco_de_guerra.tres",
 ]
 ## Partes de armadura base que pueden aparecer como botin.
 const ARMOR_ITEMS := [
@@ -56,6 +62,8 @@ const ARMOR_DEFENSE_PER_LEVEL: float = 0.06
 
 ## Probabilidad de que un enemigo suelte una gema (los elite, un poco mas).
 const GEM_CHANCE: float = 0.05
+## Probabilidad de que un enemigo suelte una runa (ver Runes).
+const RUNE_CHANCE: float = 0.06
 
 ## Peso de cada rareza (normal, magico, raro, unico, set).
 const RARITY_WEIGHTS := [60.0, 28.0, 10.0, 2.0, 3.0]
@@ -111,6 +119,10 @@ static func roll_enemy_drops(data: EnemyData, level: int, gold_mult: float = 1.0
 		var gem: Itemdata = Gems.roll_gem(level)
 		if gem:
 			drops.append({"item": gem, "quantity": 1})
+	if randf() < RUNE_CHANCE * (1.0 + data.xp_reward / 100.0) * (1.0 + magic_find):
+		var rune: Itemdata = Runes.roll()
+		if rune:
+			drops.append({"item": rune, "quantity": 1})
 	return drops
 
 
@@ -131,6 +143,10 @@ static func roll_chest_drops(level: int, quality: int, gold_mult: float = 1.0, m
 		var gem: Itemdata = Gems.roll_gem(level + 2 * quality)
 		if gem:
 			drops.append({"item": gem, "quantity": 1})
+	if randf() < 0.35 + 0.2 * quality:
+		var rune: Itemdata = Runes.roll()
+		if rune:
+			drops.append({"item": rune, "quantity": 1})
 	return drops
 
 

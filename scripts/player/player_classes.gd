@@ -13,11 +13,23 @@ class_name PlayerClasses
 ## empiezan preparando el golpe). Los clips "oad/..." salen de la biblioteca
 ## compartida (assets/characters/oad/oad_anim_library.glb). run_speed: metros
 ## por segundo que avanza el clip de correr (para que los pies no patinen).
+## WEAPON_ANIMS: lo que cambia con un arma a dos manos, un arco o dos armas
+## (se suma encima de anims). dual_wield: puede llevar un arma en cada mano.
 
 const DEFAULT := "guerrero"
 const ORDER := ["guerrero", "cazadora", "mago"]
 ## Pociones con las que arranca cualquier clase.
 const START_POTIONS: int = 3
+## Animaciones por tipo de arma, para cualquier clase (clips de la biblioteca
+## compartida, que tiene todos).
+const WEAPON_ANIMS := {
+	"two_handed": {"idle": "oad/idle_2h", "run": "oad/run_combat", "run_speed": 2.3,
+		"attacks": ["oad/attack_2h"], "attack_from": 0.1},
+	"bow": {"idle": "oad/idle_bow", "run": "oad/run_bow", "run_speed": 1.92,
+		"attacks": ["oad/shoot_bow"], "attack_from": 0.4},
+	"dual": {"idle": "oad/idle_combat", "run": "oad/run_combat", "run_speed": 2.3,
+		"attacks": ["oad/attack_1h_a", "oad/attack_1h_c", "oad/attack_1h_b"], "attack_from": 0.0},
+}
 
 const CLASSES := {
 	"guerrero": {
@@ -34,6 +46,7 @@ const CLASSES := {
 			"res://skills/piel_de_piedra.tres",
 		],
 		"items": ["res://item/items/espada_ligera.tres", "res://item/items/escudo_ligero.tres"],
+		"dual_wield": true,
 		"model": "res://assets/characters/oad/characters/warrior.glb",
 		"anims": {
 			"idle": "idle", "run": "run", "run_speed": 2.3, "death": "death",

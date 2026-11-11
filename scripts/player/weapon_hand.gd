@@ -1,8 +1,9 @@
 extends Node3D
 
 ## Muestra lo equipado en el modelo del jugador: el arma (o la ballesta, que
-## es con lo que se ataca) en la mano derecha, el escudo en el brazo
-## izquierdo, el casco en la cabeza y el peto como textura del cuerpo. Los
+## es con lo que se ataca) en la mano derecha, el arco en la izquierda, el
+## escudo en el brazo izquierdo (o la segunda arma en la mano izquierda), el
+## casco en la cabeza y el peto como textura del cuerpo. Los
 ## personajes de 0 A.D. traen huesos para eso; los modelos de las armas
 ## (item/models/) y de los cascos (assets/characters/oad/props/) estan hechos
 ## para ir pegados a esos huesos tal cual. Sin casco se ve el tocado de tela
@@ -11,12 +12,16 @@ extends Node3D
 ## Tambien prende las llamas del aura de fuego de los unicos.
 
 const HAND_BONE := "prop-weapon_R"
+const LEFT_HAND_BONE := "prop-weapon_L"
+const BOW_BONE := "prop-weapon_bow"
 const SHIELD_BONE := "prop-shield"
 const HELMET_BONE := "prop-helmet"
 ## Llamitas en el piso alrededor del personaje mientras tiene aura de fuego.
 const AURA_RADIUS: float = 260.0
 
 var _hand: BoneAttachment3D
+var _left_hand: BoneAttachment3D
+var _bow: BoneAttachment3D
 var _shield: BoneAttachment3D
 var _helmet: BoneAttachment3D
 ## Lo que el modelo de la clase trae en la cabeza (se esconde con un casco).
@@ -33,6 +38,8 @@ func _ready() -> void:
 	if skeleton == null:
 		return
 	_hand = _attachment(skeleton, HAND_BONE)
+	_left_hand = _attachment(skeleton, LEFT_HAND_BONE)
+	_bow = _attachment(skeleton, BOW_BONE)
 	_shield = _attachment(skeleton, SHIELD_BONE)
 	_helmet = _attachment(skeleton, HELMET_BONE)
 	for child in skeleton.get_children():
@@ -60,9 +67,14 @@ func _on_equipment_changed(_equip_index: int) -> void:
 func _refresh() -> void:
 	var melee: Itemdata = inventory_data.get_equipped(inventory_data.MELEE_EQUIP)
 	var special: Itemdata = inventory_data.get_equipped(inventory_data.SPECIAL_EQUIP)
-	var in_hand: Itemdata = special if special and special.is_ranged() else melee
-	var on_arm: Itemdata = special if special and not special.is_ranged() else null
-	_show(_hand, in_hand)
+	var ranged: Itemdata = special if special and special.is_ranged() else null
+	var in_hand: Itemdata = ranged if ranged and not ranged.bow else melee
+	var offhand: Itemdata = special if special and special.item_type == Itemdata.ItemType.MELEE_WEAPON else null
+	var on_arm: Itemdata = special if special and ranged == null and offhand == null else null
+	# Con arco, la mano derecha queda libre para la flecha.
+	_show(_hand, null if ranged and ranged.bow else in_hand)
+	_show(_bow, ranged if ranged and ranged.bow else null)
+	_show(_left_hand, offhand)
 	_show(_shield, on_arm)
 
 	var helmet: Itemdata = inventory_data.get_equipped(inventory_data.HELMET_EQUIP)

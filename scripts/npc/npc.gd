@@ -12,12 +12,18 @@ signal interacted(npc: Node3D)
 ## Icono en el mapa grande (Tab). Sin icono no aparece.
 @export var map_icon: Texture2D
 @export var map_icon_color: Color = Color(1.0, 0.84, 0.35)
+## Partes del modelo que no tiene que llevar (ej: el arma del personaje de 0 A.D.).
+@export var hide_props: PackedStringArray = []
 
 @onready var anim_player: AnimationPlayer = find_child("AnimationPlayer", true, false)
 
 
 func _ready() -> void:
 	add_to_group("npcs")
+	for prop_name in hide_props:
+		var prop: Node = find_child(prop_name, true, false)
+		if prop:
+			prop.queue_free()
 	if anim_player and anim_player.has_animation(idle_animation):
 		anim_player.get_animation(idle_animation).loop_mode = Animation.LOOP_LINEAR
 		anim_player.play(idle_animation)

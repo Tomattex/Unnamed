@@ -24,6 +24,9 @@
 [ext_resource type="Script" path="res://ui/smith_panel.gd" id="37_smithpanel"]
 [ext_resource type="Script" path="res://scripts/world/weather_fx.gd" id="38_weather"]
 [ext_resource type="Script" path="res://scripts/world/ambience.gd" id="39_ambience"]
+[ext_resource type="PackedScene" path="res://npc/rune_merchant.tscn" id="40_runes"]
+[ext_resource type="PackedScene" path="res://npc/weapon_master.tscn" id="41_master"]
+[ext_resource type="PackedScene" path="res://npc/sage.tscn" id="42_sage"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_g4v7s"]
 radius = 0.3
@@ -121,6 +124,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -650, 0, -450)
 
 [node name="Baul" parent="." instance=ExtResource("35_stash")]
 transform = Transform3D(0.8075, 0, 0.5898, 0, 1, 0, -0.5898, 0, 0.8075, -380, 0, -720)
+
+[node name="Runista" parent="." instance=ExtResource("40_runes")]
+transform = Transform3D(-0.848, 0, -0.53, 0, 1, 0, 0.53, 0, -0.848, 500, 0, 600)
+
+[node name="MaestroDeArmas" parent="." instance=ExtResource("41_master")]
+transform = Transform3D(-0.0587, 0, -0.9983, 0, 1, 0, 0.9983, 0, -0.0587, 850, 0, -150)
+
+[node name="Sabio" parent="." instance=ExtResource("42_sage")]
+transform = Transform3D(-0.695, 0, 0.719, 0, 1, 0, -0.719, 0, -0.695, -600, 0, 380)
 
 [node name="HUD" parent="." unique_id=1270664312 instance=ExtResource("23_hud")]
 

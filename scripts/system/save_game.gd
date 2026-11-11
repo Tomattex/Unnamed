@@ -284,6 +284,8 @@ func _write(fallen: bool = false) -> bool:
 		"gold": player_stats.gold,
 		"attributes": player_stats.attributes,
 		"health": player_stats.health,
+		"passives": player_stats.passives,
+		"passive_points": player_stats.passive_points,
 	}
 	if player_position != Vector3.INF:
 		player_data["position"] = [player_position.x, player_position.y, player_position.z]
@@ -299,6 +301,7 @@ func _write(fallen: bool = false) -> bool:
 		"equipment": _slots_to_array(inventory_data.equipment),
 		"belt": Array(inventory_data.belt),
 		"combo": skill_book.combo,
+		"skills": skill_book.to_save(),
 		"world": {"day": world_time.day, "hour": world_time.hour},
 		"weather": weather.to_save(),
 		"collected_pickups": collected_pickups,
@@ -356,6 +359,16 @@ func load_saved() -> bool:
 	var attributes: Dictionary = player_data.get("attributes", {})
 	for key in player_stats.attributes:
 		player_stats.attributes[key] = int(attributes.get(key, player_stats.attributes[key]))
+	# Habilidades por runas y pasivas: las partidas de antes no las tienen
+	# (las habilidades ya aprendidas quedan en nivel 1 y hay un punto de
+	# pasiva por cada nivel subido).
+	skill_book.load_levels(data.get("skills", null), player_stats.level)
+	player_stats.passives.clear()
+	var passives: Dictionary = player_data.get("passives", {})
+	for id in passives:
+		if Passives.LIST.has(id):
+			player_stats.passives[id] = clampi(int(passives[id]), 1, Passives.MAX_LEVEL)
+	player_stats.passive_points = int(player_data.get("passive_points", player_stats.level - 1))
 	player_stats.buffs.clear()
 	player_stats.dead = false
 	var health: float = float(player_data.get("health", 0.0))
@@ -381,6 +394,7 @@ func load_saved() -> bool:
 	player_stats.health_changed.emit(player_stats.health, player_stats.get_max_health())
 	player_stats.buffs_changed.emit()
 	player_stats.stats_changed.emit()
+	player_stats.passives_changed.emit()
 	return true
 
 

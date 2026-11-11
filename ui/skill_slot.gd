@@ -1,7 +1,8 @@
 extends PanelContainer
 
-## Casilla de la barra de habilidades: icono, tecla, recarga (se oscurece y
-## muestra los segundos) y candado con el nivel necesario.
+## Casilla de la barra de habilidades: icono, tecla, nivel de la habilidad,
+## recarga (se oscurece y muestra los segundos) y, si todavia no se aprendio,
+## el aviso de que hace falta su runa.
 
 signal pressed(index: int)
 
@@ -12,6 +13,7 @@ var _icon: TextureRect
 var _cooldown_overlay: ColorRect
 var _cooldown_label: Label
 var _lock_label: Label
+var _level_label: Label
 var _was_cooling: bool = false
 
 
@@ -21,7 +23,7 @@ func setup(slot_index: int) -> void:
 	custom_minimum_size = SLOT_SIZE
 	theme_type_variation = &"SlotPanel"
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	mouse_entered.connect(func() -> void: tooltip_text = skill.get_tooltip())
+	mouse_entered.connect(func() -> void: tooltip_text = skill_book.get_tooltip(index))
 
 	var holder := Control.new()
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -47,7 +49,7 @@ func setup(slot_index: int) -> void:
 	_cooldown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	_lock_label = _make_label(holder, 13, Color(0.85, 0.75, 0.55))
-	_lock_label.text = "Nv %d" % skill.unlock_level
+	_lock_label.text = "Runa"
 	_lock_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -55,6 +57,11 @@ func setup(slot_index: int) -> void:
 	var key_label: Label = _make_label(holder, 13, Color(1, 0.9, 0.6))
 	key_label.text = str(index + 1)
 	key_label.position = Vector2(2, -2)
+
+	_level_label = _make_label(holder, 12, Color(0.75, 0.9, 1.0))
+	_level_label.position = Vector2(0, 34)
+	_level_label.size = Vector2(SLOT_SIZE.x - 6, 18)
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 
 func _make_label(parent: Control, font_size: int, color: Color) -> Label:
@@ -71,6 +78,7 @@ func _process(_delta: float) -> void:
 	var unlocked: bool = skill_book.is_unlocked(index)
 	_icon.modulate = Color.WHITE if unlocked else Color(0.28, 0.28, 0.28)
 	_lock_label.visible = not unlocked
+	_level_label.text = str(skill_book.get_level(index)) if unlocked else ""
 
 	var left: float = skill_book.get_cooldown_left(index) if unlocked else 0.0
 	# La parte oscura baja a medida que la habilidad se recarga.

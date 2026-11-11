@@ -69,7 +69,8 @@ func mount() -> void:
 		return
 	mounted = true
 	_horse.visible = true
-	character.speed = _base_speed * SPEED_MULT
+	# La pasiva Equitacion lo hace galopar mas rapido.
+	character.speed = _base_speed * SPEED_MULT * player_stats.get_riding_multiplier()
 	character.intervalo_pasos = STEP_INTERVAL
 	character.reproductor_pasos.pitch_scale = STEP_PITCH
 	_set_lift(RIDER_LIFT)

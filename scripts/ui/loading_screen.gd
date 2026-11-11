@@ -46,6 +46,14 @@ const TIPS := [
 	"En modo extremo hay una sola vida: si caés, el personaje se pierde para siempre.",
 	"W, E, R y T usan lo que tengas en el cinturón: pociones, antídotos o el pergamino de retorno.",
 	"Con F juntás todo lo que quedó tirado cerca tuyo.",
+	"Las habilidades se aprenden y se suben leyendo runas: doble clic sobre la runa en el inventario.",
+	"Cada nivel de una habilidad pega más fuerte, pero tarda un poco más en recargarse.",
+	"¿Runas de otra clase? La Runista de la aldea te las cambia por runas tuyas.",
+	"Con P abrís las pasivas: cada nivel da un punto, y en algunos niveles podés elegir una nueva.",
+	"El Maestro de armas y el Sabio de la aldea entrenan tus pasivas a cambio de oro.",
+	"Las armas a dos manos pegan muchísimo, pero no dejan lugar para el escudo.",
+	"El guerrero puede llevar un arma en cada mano: los golpes se alternan y salen más rápido.",
+	"La cazadora también usa arcos: más rápidos que las ballestas, aunque pegan menos.",
 ]
 
 ## true mientras se ve la pantalla (para no encimar dos viajes).

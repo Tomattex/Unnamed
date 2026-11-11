@@ -48,12 +48,21 @@ func _refresh_stock_if_needed() -> void:
 		stock.append({"item": Loot.generate_item(player_stats.level, rarity), "quantity": 1})
 
 
+## Con la pasiva Comercio se compra mas barato y se vende mas caro.
 static func buy_price(item: Itemdata) -> int:
-	return maxi(1, item.value)
+	return maxi(1, roundi(item.value * (1.0 - _trade_bonus())))
 
 
 static func sell_price(item: Itemdata) -> int:
-	return maxi(1, item.value / 4)
+	return maxi(1, roundi(item.value / 4.0 * (1.0 + _trade_bonus())))
+
+
+# El personaje se busca en el arbol: estas funciones tambien las usa el
+# tooltip, que puede cargarse antes que los autoloads.
+static func _trade_bonus() -> float:
+	var tree := Engine.get_main_loop() as SceneTree
+	var stats: Node = tree.root.get_node_or_null("player_stats") if tree else null
+	return stats.get_trade_bonus() if stats else 0.0
 
 
 ## Compra la entrada index del stock. Devuelve un texto de error o "" si salio bien.

@@ -8,6 +8,9 @@ const Nameplates := preload("res://ui/nameplates.gd")
 const ComboSlot := preload("res://ui/combo_slot.gd")
 const MapOverlay := preload("res://ui/map_overlay.gd")
 const BestiaryPanel := preload("res://ui/bestiary_panel.gd")
+const PassivesPanel := preload("res://ui/passives_panel.gd")
+const TrainerPanel := preload("res://ui/trainer_panel.gd")
+const RunePanel := preload("res://ui/rune_panel.gd")
 const POTION := preload("res://item/items/potion_of_health.tres")
 
 ## La camara del retrato mira a este punto sobre el hueso de la cabeza.
@@ -65,7 +68,8 @@ func _ready() -> void:
 	$Root.add_child(overlay)
 	$Root.move_child(overlay, 0)
 	var panels: Node = get_parent().get_node_or_null("UI")
-	(panels if panels else self).add_child.call_deferred(BestiaryPanel.new())
+	for panel in [BestiaryPanel.new(), PassivesPanel.new(), TrainerPanel.new(), RunePanel.new()]:
+		(panels if panels else self).add_child.call_deferred(panel)
 	_on_health_changed(player_stats.health, player_stats.get_max_health())
 	_on_xp_changed(player_stats.xp, player_stats.xp_for_next_level())
 	level_label.text = str(player_stats.level)
@@ -83,6 +87,9 @@ func _ready() -> void:
 		slot.setup(i)
 		slot.pressed.connect(_on_skill_slot_pressed)
 	skill_book.skill_unlocked.connect(_on_skill_unlocked)
+	skill_book.skill_leveled.connect(func(index: int, level: int) -> void:
+		sfx.play("new_skill")
+		show_message("%s sube a nivel %d" % [skill_book.get_skill(index).name, level], Color(0.6, 0.9, 1.0), 2.5))
 	var combo_slot := ComboSlot.new()
 	skill_bar.add_child(combo_slot)
 	combo_slot.pressed.connect(func() -> void:
@@ -203,8 +210,6 @@ func _on_skill_slot_pressed(index: int) -> void:
 func _on_skill_unlocked(index: int) -> void:
 	var skill: SkillData = skill_book.get_skill(index)
 	sfx.play("new_spell" if skill.kind == SkillData.Kind.PROJECTILE else "new_skill")
-	# Espera a que termine el mensaje de nivel para no taparlo.
-	await get_tree().create_timer(1.6, false).timeout
 	show_message("Nueva habilidad: %s (tecla %d)" % [skill.name, index + 1], Color(0.6, 0.9, 1.0), 3.0)
 
 
@@ -369,6 +374,9 @@ func _update_buffs() -> void:
 func _on_leveled_up(new_level: int) -> void:
 	level_label.text = str(new_level)
 	show_message("¡Nivel %d!" % new_level)
+	if new_level in Passives.SLOT_LEVELS:
+		await get_tree().create_timer(2.6, false).timeout
+		show_message("Podés elegir una pasiva nueva (tecla P)", Color(0.6, 0.9, 1.0), 3.0)
 
 
 func _on_died() -> void:
