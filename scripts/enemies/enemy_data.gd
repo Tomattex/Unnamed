@@ -3,8 +3,12 @@ extends Resource
 class_name EnemyData
 
 ## De que esta hecho el cuerpo: cambia las marcas en el piso, las particulas
-## y el sonido de los golpes.
-enum Body { FLESH, BONE, INSECT, UNDEAD }
+## y el sonido de los golpes. SPIRIT = espectros (no sangran: se deshacen).
+enum Body { FLESH, BONE, INSECT, UNDEAD, SPIRIT }
+## Papel en su grupo (ver scripts/enemies/enemy_role.gd): el curandero cura y
+## potencia a los suyos, el lider los enardece y el nigromante levanta a los
+## esqueletos caidos.
+enum Role { NONE, HEALER, LEADER, NECROMANCER }
 
 ## Tipo de enemigo: modelo, animaciones y stats base (a nivel 1).
 ## Cada tipo es un .tres en enemies/types/.
@@ -39,6 +43,41 @@ enum Body { FLESH, BONE, INSECT, UNDEAD }
 ## Animacion al aparecer (ej: salir del suelo). Mientras dura, el enemigo no se mueve.
 @export var spawn_animation: String = ""
 @export var spawn_animation_speed: float = 1.0
+## Al perseguir o huir (vacio = las de caminar, mas rapido).
+@export var run_animation: String = ""
+@export var run_animation_speed: float = 1.0
+## Al curar, potenciar o levantar muertos (roles).
+@export var cast_animation: String = ""
+
+@export_group("Comportamiento")
+## Pacifico (fauna): nunca ataca; huye del jugador y de los enemigos que se le
+## acercan a menos de flee_range. Se puede cazar.
+@export var passive: bool = false
+@export var flee_range: float = 900.0
+## Si es mayor que 0, se aleja cuando el jugador se le acerca a menos de esto
+## (arqueros, magos) y vuelve a tirar desde lejos.
+@export var keep_distance: float = 0.0
+@export var role: Role = Role.NONE
+## Compañeros con los que aparece (el lider con su banda, el chaman con sus
+## esqueletos). Se elige al azar de la lista para cada uno.
+@export var escorts: Array[EnemyData] = []
+@export var escort_count: Vector2i = Vector2i(2, 3)
+## Solo aparece de noche y se desvanece al amanecer.
+@export var night_only: bool = false
+## Vuela: el modelo se mece arriba y abajo (model_offset_y da la altura).
+@export var hover_bob: float = 0.0
+## Al perseguir zigzaguea (murcielagos).
+@export var erratic: bool = false
+## Fantasmal: semitransparente, con brillo en los bordes de este color.
+@export var ghostly: bool = false
+@export var ghost_color: Color = Color(0.55, 0.8, 1.0)
+## Caza animales pacificos (y aldeanos) que tenga cerca si el jugador no esta.
+@export var hunts_animals: bool = false
+## Anda por los caminos: a veces su grupo patrulla uno o espera escondido al
+## costado para emboscar (bandidos).
+@export var roads: bool = false
+## Color de sus conjuros (proyectiles magicos, curas).
+@export var spell_color: Color = Color.TRANSPARENT
 
 @export_group("Cuerpo")
 @export var body: Body = Body.FLESH

@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://enemies/models/model_dress.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/characters/oad/characters/priest.glb" id="2_model"]
+
+[node name="Nigromante" type="Node3D"]
+script = ExtResource("1_script")
+tints = {"Body": Color(0.32, 0.26, 0.38, 1), "Hood": Color(0.22, 0.17, 0.26, 1), "Head": Color(0.78, 0.76, 0.82, 1), "WeaponR": Color(0.45, 0.4, 0.45, 1)}
+
+[node name="Modelo" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(225, 0, 0, 0, 225, 0, 0, 0, 225, 0, 0, 0)

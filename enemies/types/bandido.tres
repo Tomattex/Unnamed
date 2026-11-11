@@ -17,6 +17,7 @@ walk_animation_speed = 0.7
 death_animation = "death"
 hit_animations = Array[String](["hit"])
 extra_death_animations = Array[String](["death_b"])
+roads = true
 max_health = 95.0
 min_damage = 9
 max_damage = 15

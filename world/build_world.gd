@@ -118,8 +118,9 @@ var _pools: Array[Vector3] = []
 var _gates: Array = []
 var _fort_bounds: Dictionary = {}
 
-## Caminos de tierra: listas de puntos (x, z).
-var _paths: Array = [
+## Caminos de tierra: listas de puntos (x, z). Los usan tambien los bandidos
+## (scripts/world/roads.gd).
+const PATHS := [
 	[Vector2(0, -200), Vector2(-1500, -500), Vector2(-3000, -900), Vector2(-4300, -1300), Vector2(-5600, -2000)],
 	[Vector2(0, -200), Vector2(1500, -900), Vector2(2800, -1900), Vector2(3800, -3000), Vector2(4900, -3900)],
 	[Vector2(0, -200), Vector2(200, -1800), Vector2(500, -3500), Vector2(-200, -5200), Vector2(-500, -6400), Vector2(0, -7300)],
@@ -134,6 +135,7 @@ var _paths: Array = [
 	[Vector2(4900, -3900), Vector2(7600, -5200), Vector2(10300, -6100), Vector2(12600, -6600)],
 	[Vector2(-4000, -3400), Vector2(-7200, -5600), Vector2(-10100, -6600), Vector2(-12800, -7400)],
 ]
+var _paths: Array = PATHS
 
 ## Zonas: centro (x, z) y radio.
 const VILLAGE := Vector3(0, -200, 2500)

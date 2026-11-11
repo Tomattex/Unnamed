@@ -26,8 +26,9 @@ static var _materials: Dictionary = {}
 ## Marcas de golpes en el piso que siguen a la vista (las mas viejas se borran).
 static var _marks: Array[Node] = []
 const MAX_MARKS: int = 40
-## Color de la sangre segun EnemyData.Body (los huesos no sangran: polvo).
-const BODY_COLORS := [Color(0.42, 0.02, 0.02), Color(0.86, 0.82, 0.7), Color(0.32, 0.55, 0.1), Color(0.16, 0.06, 0.04)]
+## Color de la sangre segun EnemyData.Body (los huesos no sangran: polvo; los
+## espectros sueltan jirones de luz).
+const BODY_COLORS := [Color(0.42, 0.02, 0.02), Color(0.86, 0.82, 0.7), Color(0.32, 0.55, 0.1), Color(0.16, 0.06, 0.04), Color(0.6, 0.85, 1.0)]
 static var _hit_stop_until: float = 0.0
 
 
@@ -359,6 +360,9 @@ static func hit_stop(node: Node, duration: float = 0.06) -> void:
 ## big = al morir (mas gotas y un charco).
 static func body_hit(parent: Node, position: Vector3, body: int, size: float, big: bool = false) -> void:
 	var color: Color = BODY_COLORS[body]
+	if body == EnemyData.Body.SPIRIT:
+		spirit_wisps(parent, position, color, 14 if big else 6, size)
+		return
 	var bone: bool = body == EnemyData.Body.BONE
 	var drops: CPUParticles3D = particles(SOFT, false, 1, 28 if big else 12, 0.55, 30.0 if bone else 24.0)
 	drops.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
@@ -405,6 +409,22 @@ static func body_hit(parent: Node, position: Vector3, body: int, size: float, bi
 	for i in range(_marks.size() - 1, -1, -1):
 		if not is_instance_valid(_marks[i]):
 			_marks.remove_at(i)
+
+
+## Jirones de luz que suben y se apagan (espectros golpeados, conjuros oscuros).
+static func spirit_wisps(parent: Node, position: Vector3, color: Color, amount: int, size: float) -> void:
+	var wisps: CPUParticles3D = particles(MAGIC, true, STRIP_FRAMES, amount, 0.9, 80.0)
+	wisps.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	wisps.emission_sphere_radius = size * 0.4
+	wisps.direction = Vector3.UP
+	wisps.spread = 50.0
+	wisps.initial_velocity_min = 60.0
+	wisps.initial_velocity_max = 200.0
+	wisps.gravity = Vector3(0, 80.0, 0)
+	wisps.angle_min = -180.0
+	wisps.angle_max = 180.0
+	wisps.color_ramp = ramp([Color(color.lightened(0.4), 0.0), Color(color, 0.9), Color(color, 0.0)])
+	emit_once(parent, wisps, position, 0.8)
 
 
 ## Particulas de un solo disparo que se borran solas al terminar.

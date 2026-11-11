@@ -142,6 +142,9 @@ func _draw_content() -> void:
 			_content.draw_arc(pos, 4.0, 0.0, TAU, 16, PORTAL, 2.0)
 
 	for enemy in get_tree().get_nodes_in_group("enemies"):
+		# La fauna no es un peligro: no se marca.
+		if enemy.data.passive:
+			continue
 		var pos: Vector2 = _to_map(Vector2(enemy.global_position.x, enemy.global_position.z), origin, axes)
 		if pos.distance_to(size / 2.0) > max_dist:
 			continue

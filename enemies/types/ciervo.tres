@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/ciervo.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Ciervo"
+model_offset_y = 0.0
+collision_radius = 70.0
+pack_size = Vector2i(2, 4)
+idle_animation = "graze"
+walk_animations = Array[String](["walk"])
+run_animation = "run"
+run_animation_speed = 1.2
+death_animation = "death"
+extra_death_animations = Array[String](["death_b"])
+passive = true
+flee_range = 1100.0
+max_health = 30.0
+min_damage = 0
+max_damage = 0
+speed = 560.0
+detection_range = 0.0
+xp_reward = 4
+gold_min = 0
+gold_max = 0

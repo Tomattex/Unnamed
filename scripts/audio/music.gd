@@ -121,10 +121,8 @@ func _in_combat(player: Node3D) -> bool:
 	if player_stats.dead:
 		return false
 	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if enemy.dead:
-			continue
-		var chasing: bool = enemy.state == enemy.State.CHASE or enemy.state == enemy.State.ATTACK
-		if chasing and enemy.global_position.distance_to(player.global_position) < COMBAT_RANGE:
+		# Persiguiendo una presa (un lobo cazando) no cuenta como pelea.
+		if enemy.in_combat() and enemy.global_position.distance_to(player.global_position) < COMBAT_RANGE:
 			return true
 	return false
 

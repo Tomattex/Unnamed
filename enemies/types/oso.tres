@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/oso.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Oso pardo"
+model_offset_y = 0.0
+collision_radius = 110.0
+pack_size = Vector2i(1, 1)
+idle_animation = "idle"
+walk_animations = Array[String](["walk"])
+attack_animations = Array[String](["attack_a", "attack_c", "attack_b"])
+death_animation = "death"
+run_animation = "run"
+walk_animation_speed = 0.8
+hunts_animals = true
+max_health = 170.0
+min_damage = 13
+max_damage = 22
+defense = 6
+speed = 330.0
+attack_cooldown = 1.8
+attack_range = 270.0
+detection_range = 1300.0
+resist_poison = 10.0
+aggro_sound = "bear_roar"
+attack_sound = "bear_attack"
+death_sound = "bear_death"
+xp_reward = 75
+gold_min = 0
+gold_max = 4

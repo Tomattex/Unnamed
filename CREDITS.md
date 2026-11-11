@@ -99,6 +99,11 @@ Están en `assets/characters/oad/` junto con la licencia original
   Los huesos de los esqueletos no son de 0 A.D.: los arma
   `enemies/models/no_muertos/build_no_muertos.gd` con figuras simples y van
   pegados al esqueleto de animación de 0 A.D. para usar sus animaciones.
+- Fauna: el oso, el jabalí, el ciervo y el conejo (`assets/animals/oad/`, con
+  su `LICENSE.txt`) son animales de 0 A.D. con sus animaciones, pasados a glTF
+  igual que los personajes. El jefe bandido, el nigromante y el chamán
+  esqueleto usan cuerpos y accesorios de 0 A.D. (capucha, báculo) con otros
+  colores (`enemies/models/model_dress.gd`).
 - **Comparte igual:** estos archivos y cualquier cambio que se les haga siguen
   bajo CC BY-SA 3.0. El resto del juego (código y demás arte) no cambia de
   licencia por incluirlos.
@@ -168,6 +173,7 @@ modelos de Poly Haven o Kenney.
 | Caballo con animaciones (montura) | Quaternius | https://poly.pizza/m/qvTrSG9pZF (CC0 1.0) |
 | Lobo con animaciones (enemigo) | Quaternius | https://poly.pizza/m/P1gU3Qkr9r (CC0 1.0) |
 | Araña con animaciones (enemigo) | Quaternius | https://poly.pizza/m/yRYJiAJyiM (CC0 1.0) |
+| Murciélago con animaciones (enemigo) | Quaternius | https://poly.pizza/m/hNO9XvjlKa (CC0 1.0) |
 
 ### Con atribución (CC-BY 3.0)
 
@@ -226,4 +232,5 @@ CC0 o dominio público. Los de antes (golpes, interfaz, pasos y hechizos de
 | Cuervos (`crows.ogg`, "Crows singing", en mono) | IgnasD | https://opengameart.org/content/crows-singing (CC0) |
 | Graznido suelto (`crow_caw.ogg`, "Crow caw", en mono) | zeroisnotnull | https://opengameart.org/content/crow-caw (CC0) |
 | Búho (`owl.ogg`, "Barred Owl, Yellowstone National Park", en mono) | National Park Service | https://commons.wikimedia.org/wiki/File:Barred_Owl,_Yellowstone_National_Park.oga (dominio público) |
+| Oso, jabalí, murciélago, espectro y nigromante (`sounds/creatures/oso/`, `jabali/`, `murcielago/`, `espectro/`, `nigromante/`: roar, grunt, cute, breath, ooh, scream, attack y die) | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx · https://opengameart.org/content/80-cc0-creture-sfx-2 (CC0) |
 | Río y olas del mar (`sounds/ambient/water/rio.wav`, `olas.wav`) | hechos para este juego (ruido filtrado y burbujas generados por código) | CC0 |

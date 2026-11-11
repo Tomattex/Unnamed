@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://enemies/models/model_dress.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/characters/oad/characters/bandit_axe.glb" id="2_model"]
+
+[node name="JefeBandido" type="Node3D"]
+script = ExtResource("1_script")
+tints = {"Shield": Color(0.7, 0.45, 0.4, 1)}
+hidden = PackedStringArray("Bandana")
+attach = {"prop-helmet": "res://assets/characters/oad/props/helmet_celt_berru.glb"}
+
+[node name="Modelo" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(225, 0, 0, 0, 225, 0, 0, 0, 225, 0, 0, 0)

@@ -14,13 +14,24 @@ extends CharacterBody3D
 ## Al recibir un golpe se sacude (a veces con su animacion) y deja marcas segun
 ## de que esta hecho (sangre, polvo de hueso); los criticos lo frenan. Al morir
 ## cae hacia atras desde donde le pegaron y los esqueletos se desarman.
+## Ademas (ver EnemyData):
+## FLEE: la fauna pacifica huye del jugador y de los enemigos; se puede cazar.
+## Los cazadores (lobos, osos) persiguen animales cercanos si el jugador no esta.
+## AMBUSH: escondido junto al camino (invisible) hasta que el jugador se acerca.
+## PATROL: recorre un camino ida y vuelta (bandidos).
+## Los que mantienen distancia (arqueros, magos) se alejan si se les acercan.
+## Los nocturnos se desvanecen al amanecer; los voladores se mecen en el aire;
+## los fantasmales son semitransparentes. Los roles (curar, liderar, levantar
+## muertos) los maneja scripts/enemies/enemy_role.gd.
 
 signal died
 
-enum State { SPAWNING, IDLE, WANDER, CHASE, ATTACK, DEAD }
+enum State { SPAWNING, IDLE, WANDER, CHASE, ATTACK, DEAD, FLEE, AMBUSH, PATROL }
 
 const DEFAULT_DATA: EnemyData = preload("res://enemies/types/esqueleto.tres")
 const BOLT := preload("res://scripts/skills/bolt.gd")
+const ROLE_SCRIPT := preload("res://scripts/enemies/enemy_role.gd")
+const GHOST_SHADER := preload("res://scripts/enemies/ghost.gdshader")
 const GRAVITY: float = 2000.0
 const WANDER_RADIUS: float = 350.0
 ## Si el jugador se le escapa mas lejos que esto durante LOSE_TIME segundos,
@@ -72,6 +83,25 @@ const CORPSE_TIME: float = 5.0
 ## y la camara no lo ve). Cada cuanto se revisa, en segundos.
 const DESPAWN_RANGE: float = 4500.0
 const DESPAWN_CHECK: float = 1.0
+## Emboscada: a esta distancia del jugador salen de su escondite (y avisan a
+## los escondidos que tengan cerca).
+const AMBUSH_RANGE: float = 800.0
+const AMBUSH_CALL_RANGE: float = 900.0
+## Fauna: cada cuanto mira si hay peligro cerca y cuanto huye como minimo.
+const THREAT_CHECK: float = 0.3
+const FLEE_TIME: float = 4.0
+## Cazadores: cada cuanto buscan presa. Si el jugador se acerca a menos de esta
+## parte de su deteccion, dejan la presa y van por el.
+const HUNT_CHECK: float = 0.5
+const PREFER_PLAYER: float = 0.6
+const HUNT_SPRINT: float = 1.35
+## Los que mantienen distancia retroceden esto como maximo cada vez.
+const RETREAT_TIME: float = 1.1
+const RETREAT_COOLDOWN: float = 2.5
+## Esqueletos y no-muertos caidos que un nigromante todavia puede levantar
+## ({position, data, level, time, corpse}). Se olvidan a los FALLEN_TIME segundos.
+const FALLEN_TIME: float = 25.0
+static var fallen: Array = []
 
 @export var data: EnemyData
 @export var level: int = 1
@@ -82,6 +112,14 @@ var champion: bool = false
 var epithet: String = ""
 ## Ultima vez que recibio un golpe (los carteles de vida lo muestran un rato).
 var last_hit_at: float = -100.0
+## Lo levanto o invoco un nigromante: no suelta botin y da poca experiencia.
+var summoned: bool = false
+## Lo pone la zona: aparece escondido y sale cuando el jugador se acerca.
+var ambush: bool = false
+## Lo pone la zona: puntos de un camino que recorre ida y vuelta, y un
+## corrimiento propio para que el grupo no camine en fila india.
+var patrol := PackedVector3Array()
+var patrol_offset := Vector3.ZERO
 
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var model_root: Node3D = $Model
@@ -138,6 +176,32 @@ var _flinch_tween: Tween
 ## lleva buscandolo ya en rango (no da vueltas para siempre).
 var _slot := Vector3.INF
 var _slot_time: float = 0.0
+## Presa que esta cazando (animal o aldeano); null = el jugador.
+var _prey: Node3D
+var _hunt_timer: float = 0.0
+## Fauna: de que huye y por cuanto tiempo mas.
+var _threat: Node3D
+var _flee_timer: float = 0.0
+var _threat_timer: float = 0.0
+## Mantener distancia: cuanto le queda retrocediendo y cuando puede volver a hacerlo.
+var _retreat_timer: float = 0.0
+var _retreat_cooldown: float = 0.0
+var _retreat_dir := Vector3.ZERO
+var _patrol_index: int = 0
+var _patrol_step: int = 1
+## Bonos de un lider o un curandero (multiplican daño y velocidad).
+var _buff_damage: float = 1.0
+var _buff_speed: float = 1.0
+var _buff_until: float = 0.0
+## Mientras conjura (roles) se queda quieto.
+var _casting_until: float = 0.0
+var _hover_time: float = randf() * TAU
+var _ghost_materials: Array[ShaderMaterial] = []
+## Huesos sueltos de un esqueleto desarmado (un nigromante los vuelve a juntar).
+var _bone_pieces: Array[RigidBody3D] = []
+## Quien lo mato (null = el jugador): la presa que mata un lobo no da nada.
+var _killer: Node3D
+var _role: Node
 
 
 func _ready() -> void:
@@ -154,10 +218,19 @@ func _ready() -> void:
 	level += int(difficulty.get_value("enemy_levels"))
 	max_health = data.max_health * _level_scale(0.3) * difficulty.get_value("enemy_health") * (CHAMPION_HEALTH if champion else 1.0)
 	current_health = max_health
+	if data.passive:
+		# Lo que los cazadores persiguen (los aldeanos tambien se suman a "prey").
+		add_to_group("prey")
 	_setup_collision()
 	_setup_navigation()
 	_setup_model()
-	if not _start_spawn_animation():
+	if data.role != EnemyData.Role.NONE:
+		_role = ROLE_SCRIPT.new()
+		_role.enemy = self
+		add_child(_role)
+	if ambush:
+		_enter_ambush()
+	elif not _start_spawn_animation():
 		_enter_idle()
 
 
@@ -231,12 +304,16 @@ func _setup_navigation() -> void:
 	collision_layer = ENEMY_LAYER
 	collision_mask = 1
 	nav_agent.radius = body_radius() * data.model_scale
-	nav_agent.max_speed = data.speed * 1.3
+	# Margen para los bonos de velocidad (lider) y el pique al cazar.
+	nav_agent.max_speed = data.speed * 1.6
 	nav_agent.neighbor_distance = 1000.0
 	nav_agent.max_neighbors = 10
 	nav_agent.time_horizon_agents = 1.0
 	nav_agent.avoidance_enabled = true
 	nav_agent.velocity_computed.connect(_on_velocity_computed)
+	# Sin un destino pedido el agente no mueve nada (le pasaba al que aparece
+	# ya a tiro y quiere retroceder sin haber caminado nunca).
+	nav_agent.target_position = global_position
 	_stuck_from = global_position
 
 
@@ -260,6 +337,8 @@ func _setup_model() -> void:
 		mesh.material_overlay = _overlay
 		if data.tint != Color.WHITE:
 			_apply_tint(mesh)
+		if data.ghostly:
+			_make_ghostly(mesh)
 
 	_setup_hitbox(model)
 	if champion:
@@ -268,8 +347,10 @@ func _setup_model() -> void:
 	_anim_player = model.find_child("AnimationPlayer", true, false)
 	if _anim_player:
 		_set_loop(data.idle_animation, Animation.LOOP_LINEAR)
-		for anim_name in data.walk_animations + data.attack_animations + [data.death_animation] + data.hit_animations + data.extra_death_animations:
-			_set_loop(anim_name, Animation.LOOP_NONE)
+		_set_loop(data.run_animation, Animation.LOOP_LINEAR)
+		for anim_name in data.walk_animations + data.attack_animations + [data.death_animation, data.cast_animation] + data.hit_animations + data.extra_death_animations:
+			if anim_name != data.idle_animation:
+				_set_loop(anim_name, Animation.LOOP_NONE)
 		_anim_player.animation_finished.connect(_on_animation_finished)
 
 
@@ -345,6 +426,20 @@ func _start_spawn_animation() -> bool:
 	return true
 
 
+# Fantasma: shader semitransparente con la textura original apenas marcada y
+# brillo en los bordes. Sin sombra.
+func _make_ghostly(mesh: MeshInstance3D) -> void:
+	var material := ShaderMaterial.new()
+	material.shader = GHOST_SHADER
+	material.set_shader_parameter("ghost_color", data.ghost_color)
+	var base: Material = mesh.get_active_material(0)
+	if base is BaseMaterial3D and base.albedo_texture:
+		material.set_shader_parameter("albedo_texture", base.albedo_texture)
+	mesh.material_override = material
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ghost_materials.append(material)
+
+
 func _apply_tint(mesh: MeshInstance3D) -> void:
 	for i in mesh.get_surface_override_material_count():
 		var base: Material = mesh.get_active_material(i)
@@ -369,17 +464,23 @@ func _play(anim_name: String, speed_scale: float = 1.0) -> void:
 func _physics_process(delta: float) -> void:
 	if dead:
 		return
-	if despawns:
+	if despawns or data.night_only:
 		_despawn_timer -= delta
 		if _despawn_timer <= 0.0:
 			_despawn_timer = DESPAWN_CHECK
-			if _far_from_player():
+			if data.night_only and not world_time.is_night():
+				_vanish()
+				return
+			if despawns and _far_from_player():
 				queue_free()
 				return
 	_update_flash(delta)
 	_update_status(delta)
 	if dead:
 		return
+	if data.hover_bob > 0.0:
+		_hover_time += delta * 2.2
+		model_root.position.y = (data.model_offset_y + sin(_hover_time) * data.hover_bob) * _size
 
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -393,53 +494,344 @@ func _physics_process(delta: float) -> void:
 	var player_alive: bool = is_instance_valid(player) and not player_stats.dead
 	var to_player: Vector3 = (player.global_position - global_position) if player_alive else Vector3.ZERO
 	to_player.y = 0.0
-	var dist: float = to_player.length()
+	var player_dist: float = to_player.length()
+	# Persiguiendo una presa, la distancia y la direccion son a ella.
+	if _prey != null and not _prey_alive():
+		_prey = null
+		if state == State.CHASE or state == State.ATTACK:
+			_give_up()
+	var hunting: bool = _prey != null
+	var to_target: Vector3 = to_player
+	if hunting:
+		to_target = _prey.global_position - global_position
+		to_target.y = 0.0
+		if player_alive and player_dist <= data.detection_range * PREFER_PLAYER:
+			# El jugador se metio: deja la presa y va por el.
+			_prey = null
+			hunting = false
+			to_target = to_player
+	var dist: float = to_target.length()
+	var reach: float = data.attack_range + (_prey.body_radius() * 0.5 if hunting else 0.0)
+	var sees_player: bool = player_alive and player_dist <= data.detection_range and not data.passive
 
 	var move_dir := Vector3.ZERO
 	var move_speed: float = data.speed
+	_retreat_cooldown -= delta
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now >= _buff_until:
+		_buff_damage = 1.0
+		_buff_speed = 1.0
 
 	match state:
 		State.SPAWNING:
 			pass
+		State.AMBUSH:
+			if player_alive and player_dist <= AMBUSH_RANGE:
+				spring_ambush(true)
 		State.IDLE:
-			if player_alive and dist <= data.detection_range:
+			if data.passive:
+				if not _check_threats(delta) and _state_timer <= 0.0:
+					_enter_wander()
+			elif sees_player:
 				_enter_chase()
+			elif data.hunts_animals and _look_for_prey(delta):
+				pass
 			elif _state_timer <= 0.0:
-				_enter_wander()
+				if patrol.is_empty():
+					_enter_wander()
+				else:
+					_enter_patrol()
 		State.WANDER:
-			if player_alive and dist <= data.detection_range:
+			if data.passive and _check_threats(delta):
+				pass
+			elif sees_player:
 				_enter_chase()
+			elif data.hunts_animals and _look_for_prey(delta):
+				pass
 			elif _state_timer <= 0.0 or nav_agent.is_navigation_finished():
 				_enter_idle()
 			else:
 				move_dir = _nav_direction()
 				move_speed = data.speed * 0.4
+		State.PATROL:
+			if sees_player:
+				_enter_chase()
+			elif nav_agent.is_navigation_finished() or _patrol_point().distance_to(global_position) < 140.0:
+				_patrol_index += _patrol_step
+				if _patrol_index < 0 or _patrol_index >= patrol.size():
+					_patrol_step = -_patrol_step
+					_patrol_index = clampi(_patrol_index + _patrol_step * 2, 0, patrol.size() - 1)
+				state = State.IDLE
+				_state_timer = randf_range(0.8, 2.5)
+			else:
+				move_dir = _nav_direction()
+				move_speed = data.speed * 0.45
+		State.FLEE:
+			_flee_timer -= delta
+			if _check_threats(delta) or _flee_timer > 0.0:
+				move_dir = _flee_direction(delta)
+			else:
+				_enter_idle()
 		State.CHASE:
 			_calm_time = 0.0
-			if not player_alive or _lost_player(dist, delta):
+			if not hunting and (not player_alive or _lost_player(dist, delta)):
 				_give_up()
-			elif dist <= data.attack_range and _at_slot(delta):
+			elif hunting and dist > LOSE_RANGE:
+				_prey = null
+				_give_up()
+			elif dist <= reach and (hunting or _at_slot(delta)):
 				state = State.ATTACK
 				_slot_time = 0.0
+			elif hunting:
+				move_dir = _hunt_direction(to_target, dist)
 			else:
-				move_dir = _chase_direction(to_player, dist, delta)
+				move_dir = _chase_direction(to_target, dist, delta)
 		State.ATTACK:
 			_calm_time = 0.0
-			if not player_alive:
+			if not hunting and not player_alive:
 				_give_up()
-			elif dist > LOSE_RANGE or (dist > data.attack_range * 1.15 and not _attacking):
+			elif dist > LOSE_RANGE or (dist > reach * 1.15 and not _attacking):
 				_attacking = false
 				state = State.CHASE
+			elif _should_retreat(dist, hunting):
+				_start_retreat(to_target)
+			elif _retreat_timer > 0.0:
+				_retreat_timer -= delta
+				move_dir = _retreat_dir
 			else:
-				_face(to_player, delta)
-				if _attack_timer <= 0.0:
+				_face(to_target, delta)
+				if hunting and dist > data.attack_range * 0.6:
+					# A una presa que huye la muerde sin frenar.
+					move_dir = to_target.normalized()
+				if _attack_timer <= 0.0 and now >= _casting_until:
 					_attack()
+
+	if now < _casting_until:
+		move_dir = Vector3.ZERO
+	elif data.erratic and move_dir != Vector3.ZERO:
+		# Zigzag: la direccion se tuerce de un lado a otro.
+		move_dir = move_dir.rotated(Vector3.UP, sin(_hover_time * 2.3) * 0.7)
+	if state == State.CHASE or state == State.FLEE or _retreat_timer > 0.0:
+		move_speed *= _buff_speed
+	if hunting and state == State.CHASE:
+		# Cazando pica mas: si no, un ciervo siempre se le escapa.
+		move_speed *= HUNT_SPRINT
 
 	if _calm_time >= REGEN_DELAY and current_health < max_health and state != State.SPAWNING:
 		heal(max_health * REGEN_RATE * delta)
 	_check_stuck(move_dir != Vector3.ZERO, delta)
 	_move(move_dir * move_speed, delta)
 	_update_walk_animation(move_dir != Vector3.ZERO)
+
+
+## Esta peleando con el jugador (para la musica de combate): persiguiendo una
+## presa o huyendo no cuenta.
+func in_combat() -> bool:
+	return not dead and _prey == null and (state == State.CHASE or state == State.ATTACK)
+
+
+## Bono de un lider o curandero por un rato (se renueva si ya lo tiene).
+func apply_buff(damage_mult: float, speed_mult: float, duration: float) -> void:
+	_buff_damage = maxf(_buff_damage, damage_mult)
+	_buff_speed = maxf(_buff_speed, speed_mult)
+	_buff_until = maxf(_buff_until, Time.get_ticks_msec() / 1000.0 + duration)
+
+
+## Se queda quieto haciendo un conjuro (roles). Devuelve cuanto dura.
+func cast(duration: float = 0.9) -> float:
+	_casting_until = Time.get_ticks_msec() / 1000.0 + duration
+	if not data.cast_animation.is_empty() and _anim_player and _anim_player.has_animation(data.cast_animation):
+		var length: float = _anim_player.get_animation(data.cast_animation).length
+		_anim_player.play(data.cast_animation, 0.1, maxf(1.0, length / duration))
+		_anim_player.seek(0.0, true)
+	return duration
+
+
+## Para los roles: esta apareciendo o escondido (todavia no hace nada).
+func is_inactive() -> bool:
+	return state == State.SPAWNING or state == State.AMBUSH
+
+
+## Para un nigromante: el caido levantable mas cercano (lo saca de la lista) o
+## un diccionario vacio.
+func claim_fallen(max_dist: float) -> Dictionary:
+	var now: float = Time.get_ticks_msec() / 1000.0
+	var best: Dictionary = {}
+	var best_dist: float = max_dist
+	for entry in fallen:
+		if now - entry.time > FALLEN_TIME:
+			continue
+		var d: float = entry.position.distance_to(global_position)
+		if d < best_dist:
+			best_dist = d
+			best = entry
+	if not best.is_empty():
+		fallen.erase(best)
+	return best
+
+
+func _prey_alive() -> bool:
+	return is_instance_valid(_prey) and _prey.is_inside_tree() and not _prey.dead
+
+
+# --- Fauna: huir -------------------------------------------------------------
+
+# Mira si hay algo peligroso cerca (el jugador o un enemigo que no sea fauna).
+# Si lo hay, empieza a huir. Devuelve si hay peligro.
+func _check_threats(delta: float) -> bool:
+	_threat_timer -= delta
+	if _threat_timer > 0.0:
+		return state == State.FLEE and is_instance_valid(_threat) and _threat.global_position.distance_to(global_position) < data.flee_range
+	_threat_timer = THREAT_CHECK
+	var nearest: Node3D = null
+	var best: float = data.flee_range
+	if is_instance_valid(player) and not player_stats.dead:
+		best = minf(best, player.global_position.distance_to(global_position))
+		if best < data.flee_range:
+			nearest = player
+	for other in get_tree().get_nodes_in_group("enemies"):
+		if other == self or other.dead or other.data.passive:
+			continue
+		var d: float = other.global_position.distance_to(global_position)
+		# A los que lo estan cazando los ve desde mas lejos.
+		var range_mult: float = 1.3 if other._prey == self else 0.7
+		if d < best and d < data.flee_range * range_mult:
+			best = d
+			nearest = other
+	if nearest:
+		_enter_flee(nearest)
+		return true
+	return false
+
+
+func _enter_flee(threat: Node3D) -> void:
+	if threat == null:
+		return
+	if state != State.FLEE:
+		_last_nav_target = Vector3.INF
+	_threat = threat
+	state = State.FLEE
+	_flee_timer = FLEE_TIME
+
+
+# Lejos de la amenaza, por el piso caminable: apunta a un lugar a unos pasos
+# del otro lado y lo va corrigiendo.
+func _flee_direction(_delta: float) -> Vector3:
+	if is_instance_valid(_threat):
+		var away: Vector3 = global_position - _threat.global_position
+		away.y = 0.0
+		away = away.normalized() if away.length() > 1.0 else global_transform.basis.z
+		var goal: Vector3 = NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, global_position + away * 700.0)
+		_set_nav_target(goal)
+	var dir: Vector3 = _nav_direction()
+	if dir == Vector3.ZERO and is_instance_valid(_threat):
+		dir = global_position - _threat.global_position
+		dir.y = 0.0
+		dir = dir.normalized()
+	return dir
+
+
+# --- Caza ------------------------------------------------------------------------
+
+func _look_for_prey(delta: float) -> bool:
+	_hunt_timer -= delta
+	if _hunt_timer > 0.0:
+		return false
+	_hunt_timer = HUNT_CHECK
+	var best: float = data.detection_range * 0.9
+	var found: Node3D = null
+	for prey in get_tree().get_nodes_in_group("prey"):
+		if prey == self or prey.dead:
+			continue
+		var d: float = prey.global_position.distance_to(global_position)
+		if d < best:
+			best = d
+			found = prey
+	if found == null:
+		return false
+	_prey = found
+	_lose_timer = 0.0
+	state = State.CHASE
+	_last_nav_target = Vector3.INF
+	return true
+
+
+func _hunt_direction(to_prey: Vector3, dist: float) -> Vector3:
+	if dist < DIRECT_RANGE:
+		return to_prey.normalized()
+	_set_nav_target(_prey.global_position)
+	return _nav_direction()
+
+
+# --- Mantener distancia ---------------------------------------------------------
+
+func _should_retreat(dist: float, hunting: bool) -> bool:
+	return data.keep_distance > 0.0 and not hunting and not _attacking and _retreat_timer <= 0.0 \
+			and _retreat_cooldown <= 0.0 and dist < data.keep_distance
+
+
+# Retrocede alejandose del jugador, con un poco de costado, por lo caminable.
+func _start_retreat(to_target: Vector3) -> void:
+	var away: Vector3 = -to_target.normalized()
+	away = away.rotated(Vector3.UP, randf_range(-0.6, 0.6))
+	var goal: Vector3 = NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, global_position + away * data.speed * RETREAT_TIME)
+	var dir: Vector3 = goal - global_position
+	dir.y = 0.0
+	if dir.length() < data.speed * RETREAT_TIME * 0.3:
+		# Contra una pared: no tiene a donde ir, sigue tirando.
+		_retreat_cooldown = RETREAT_COOLDOWN
+		return
+	_retreat_dir = dir.normalized()
+	_retreat_timer = RETREAT_TIME
+	_retreat_cooldown = RETREAT_COOLDOWN + RETREAT_TIME
+
+
+# --- Emboscada y patrulla --------------------------------------------------------
+
+func _enter_ambush() -> void:
+	state = State.AMBUSH
+	model_root.visible = false
+	collision_layer = 0
+	nav_agent.avoidance_enabled = false
+	if _hitbox:
+		_hitbox.collision_layer = 0
+	# Escondido no es un enemigo a la vista: ni carteles, ni minimapa, ni golpes.
+	remove_from_group("enemies")
+	add_to_group("ambushers")
+
+
+## Sale del escondite gritando; shout = el primero del grupo (avisa en pantalla
+## y saca a los demas escondidos cercanos).
+func spring_ambush(shout: bool) -> void:
+	if state != State.AMBUSH or dead:
+		return
+	remove_from_group("ambushers")
+	add_to_group("enemies")
+	model_root.visible = true
+	collision_layer = ENEMY_LAYER
+	nav_agent.avoidance_enabled = true
+	if _hitbox:
+		_hitbox.collision_layer = PICK_LAYER
+	Effects.dust_puff(get_parent(), global_position + Vector3.UP * 20.0, 120.0)
+	state = State.IDLE
+	_enter_chase()
+	if shout:
+		floating_text.spawn(global_position + Vector3.UP * (_top + 140.0), "¡Emboscada!", Color(1.0, 0.45, 0.3), 26, 1.6)
+		for other in get_tree().get_nodes_in_group("ambushers"):
+			if other != self and other.global_position.distance_to(global_position) <= AMBUSH_CALL_RANGE:
+				other.spring_ambush(false)
+
+
+func _enter_patrol() -> void:
+	state = State.PATROL
+	_patrol_index = clampi(_patrol_index, 0, patrol.size() - 1)
+	_last_nav_target = Vector3.INF
+	_set_nav_target(_patrol_point())
+
+
+func _patrol_point() -> Vector3:
+	var point: Vector3 = patrol[clampi(_patrol_index, 0, patrol.size() - 1)] + patrol_offset
+	return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, point)
 
 
 # La velocidad deseada pasa por el avoidance; el resultado llega en
@@ -497,7 +889,7 @@ func _surround_goal(to_player: Vector3) -> Vector3:
 	var spacing: float = 2.0 * asin(clampf(nav_agent.radius * 1.2 / ring, 0.05, 0.95))
 	var taken: Array[float] = []
 	for other in get_tree().get_nodes_in_group("enemies"):
-		if other == self or other.state != State.ATTACK:
+		if other == self or other.state != State.ATTACK or other._prey != null:
 			continue
 		var offset: Vector3 = other.global_position - player.global_position
 		if offset.length() < data.attack_range * 2.0:
@@ -560,7 +952,7 @@ func _give_up() -> void:
 
 # Lejos del jugador, sin pelear y fuera de camara: ya no hace falta.
 func _far_from_player() -> bool:
-	if state == State.CHASE or state == State.ATTACK or not is_instance_valid(player):
+	if (state == State.CHASE or state == State.ATTACK) and _prey == null or not is_instance_valid(player):
 		return false
 	if global_position.distance_to(player.global_position) < DESPAWN_RANGE:
 		return false
@@ -583,8 +975,13 @@ func _enter_wander() -> void:
 
 
 func _enter_chase() -> void:
-	if state == State.CHASE or state == State.ATTACK or state == State.DEAD:
+	if data.passive:
 		return
+	if (state == State.CHASE or state == State.ATTACK) and _prey == null:
+		return
+	if state == State.DEAD or state == State.AMBUSH:
+		return
+	_prey = null
 	_lose_timer = 0.0
 	if not data.aggro_sound.is_empty():
 		sfx.play_at(data.aggro_sound, global_position, -4.0)
@@ -631,14 +1028,23 @@ func _attack() -> void:
 		sfx.play_at(data.attack_sound, global_position, -3.0)
 
 	var serial: int = _attack_serial
+	var prey: Node3D = _prey
 	await get_tree().create_timer(hit_delay, false).timeout
 	# Si lo frenaron con un critico mientras levantaba el arma, no pega.
-	if dead or serial != _attack_serial or not is_instance_valid(player) or player_stats.dead:
+	if dead or serial != _attack_serial:
+		return
+	var damage: float = randi_range(data.min_damage, data.max_damage) * _level_scale(0.2) * difficulty.get_value("enemy_damage") \
+			* (CHAMPION_DAMAGE if champion else 1.0) * _buff_damage
+	var parts: Dictionary = Damage.split(damage, data.attack_damage_type, data.attack_conversion)
+	if prey != null:
+		# Mordida a la presa (animal o aldeano): no da nada al jugador.
+		if is_instance_valid(prey) and not prey.dead and prey.global_position.distance_to(global_position) <= data.attack_range * 1.5 + prey.body_radius():
+			prey.take_hit({"parts": parts, "source": self})
+		return
+	if not is_instance_valid(player) or player_stats.dead:
 		return
 	var to_player: Vector3 = player.global_position - global_position
 	to_player.y = 0.0
-	var damage: float = randi_range(data.min_damage, data.max_damage) * _level_scale(0.2) * difficulty.get_value("enemy_damage") * (CHAMPION_DAMAGE if champion else 1.0)
-	var parts: Dictionary = Damage.split(damage, data.attack_damage_type, data.attack_conversion)
 	if data.shoots:
 		_shoot(to_player.normalized(), parts)
 	elif to_player.length() <= data.attack_range * 1.3 and player.has_method("take_hit"):
@@ -653,19 +1059,26 @@ func _shoot(direction: Vector3, parts: Dictionary) -> void:
 	bolt.max_range = data.attack_range + 600.0
 	bolt.hit = {"parts": parts}
 	bolt.hits_player = true
+	# Los magos (chaman, nigromante) tiran un conjuro del color de su magia.
+	bolt.glow = data.spell_color
 	Effects.add_at(get_parent(), bolt, global_position + Vector3.UP * 230.0 * _size + direction * 60.0)
-	sfx.play_at("bow_shoot", global_position, -4.0)
+	sfx.play_at("bow_shoot" if data.spell_color.a <= 0.0 else "unknown_spell", global_position, -4.0)
 
 
 # --- Animaciones de movimiento --------------------------------------------
 
 func _update_walk_animation(moving: bool) -> void:
-	if _anim_player == null or _attacking or state == State.SPAWNING:
+	if _anim_player == null or _attacking or state == State.SPAWNING or state == State.AMBUSH:
 		return
-	if Time.get_ticks_msec() / 1000.0 < _reacting_until:
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now < _reacting_until or now < _casting_until:
 		return
 	var current: String = _anim_player.current_animation
-	if moving and not current in data.walk_animations:
+	var running: bool = state == State.CHASE or state == State.FLEE or _retreat_timer > 0.0
+	if moving and running and not data.run_animation.is_empty() and _anim_player.has_animation(data.run_animation):
+		if current != data.run_animation:
+			_play(data.run_animation, data.run_animation_speed)
+	elif moving and not current in data.walk_animations:
 		_walk_step = 0
 		if not data.walk_animations.is_empty():
 			_play(data.walk_animations[0], data.walk_animation_speed)
@@ -679,7 +1092,7 @@ func _on_animation_finished(anim_name: StringName) -> void:
 	if state == State.SPAWNING and anim_name == data.spawn_animation:
 		_enter_idle()
 		_play(data.idle_animation)
-	elif anim_name in data.attack_animations:
+	elif anim_name in data.attack_animations or anim_name == data.cast_animation:
 		_attacking = false
 		_play(data.idle_animation)
 	elif anim_name in data.walk_animations and not data.walk_animations.is_empty():
@@ -696,6 +1109,9 @@ func _on_animation_finished(anim_name: StringName) -> void:
 func take_hit(hit: Dictionary) -> void:
 	if dead:
 		return
+	if state == State.AMBUSH:
+		spring_ambush(true)
+	var source: Node3D = hit.get("source")
 	last_hit_at = Time.get_ticks_msec() / 1000.0
 	var defense: int = roundi(data.defense * (CHAMPION_DEFENSE if champion else 1.0))
 	var result: Dictionary = Damage.mitigate(hit.parts, defense, data.get_resistances())
@@ -721,9 +1137,15 @@ func take_hit(hit: Dictionary) -> void:
 		floating_text.spawn(head, "Envenenado", Damage.COLORS[Damage.Type.POISON], 18)
 
 	if current_health <= 0.0:
+		_killer = source
 		_die()
 		return
 	_calm_time = 0.0
+	if data.passive:
+		# La fauna no pelea: huye del que le pego y espanta a los de su manada.
+		_enter_flee(source if is_instance_valid(source) else player)
+		_alert_pack()
+		return
 	_enter_chase()
 	_alert_pack()
 
@@ -814,9 +1236,14 @@ func heal(amount: float) -> void:
 # Cuando le pegan a uno, los cercanos que esten tranquilos tambien atacan.
 func _alert_pack() -> void:
 	for other in get_tree().get_nodes_in_group("enemies"):
-		if other != self and not other.dead and other.state in [State.IDLE, State.WANDER]:
-			if other.global_position.distance_to(global_position) <= PACK_ALERT_RANGE:
-				other._enter_chase()
+		if other == self or other.dead or other.data.passive != data.passive:
+			continue
+		if other.global_position.distance_to(global_position) > PACK_ALERT_RANGE:
+			continue
+		if data.passive:
+			other._enter_flee(_threat)
+		elif other.state in [State.IDLE, State.WANDER, State.PATROL] or other._prey != null:
+			other._enter_chase()
 
 
 # Esqueletos: a poco de empezar a caer, el cuerpo se desarma en huesos
@@ -883,6 +1310,7 @@ func _crumble() -> void:
 			copy.transform = Transform3D(Basis.from_scale(scaled), Vector3.ZERO)
 			pieces.append(_debris(Transform3D(prop.global_transform.basis.orthonormalized(), prop.global_transform.origin), [copy], shape))
 	model_root.visible = false
+	_bone_pieces = pieces
 	var push: Vector3 = _last_hit_dir.normalized() if _last_hit_dir.length() > 1.0 else Vector3.ZERO
 	for body in pieces:
 		body.apply_central_impulse((push * randf_range(150.0, 450.0) + Vector3.UP * randf_range(250.0, 600.0)
@@ -895,6 +1323,23 @@ func _crumble() -> void:
 			var tween := body.create_tween()
 			tween.tween_property(body, "scale", Vector3.ONE * 0.01, 1.2)
 			tween.tween_callback(body.queue_free)
+
+
+## Un nigromante lo levanta: los huesos sueltos vuelan a juntarse en el lugar y
+## el cadaver se va (el esqueleto nuevo lo crea el nigromante).
+func reassemble(duration: float) -> void:
+	for body in _bone_pieces:
+		if not is_instance_valid(body):
+			continue
+		body.freeze = true
+		var tween := body.create_tween().set_parallel(true)
+		tween.tween_property(body, "global_position", global_position + Vector3.UP * 120.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(body, "scale", Vector3.ONE * 0.2, duration)
+		tween.chain().tween_callback(body.queue_free)
+	_bone_pieces.clear()
+	var tween := create_tween()
+	tween.tween_property(self, "position:y", position.y - 300.0, duration)
+	tween.tween_callback(queue_free)
 
 
 func _debris(where: Transform3D, meshes: Array, shape: CollisionShape3D) -> RigidBody3D:
@@ -914,6 +1359,9 @@ func _debris(where: Transform3D, meshes: Array, shape: CollisionShape3D) -> Rigi
 
 
 func _drop_loot() -> void:
+	# Ni la fauna ni los invocados llevan nada encima.
+	if data.passive or summoned:
+		return
 	var gold_mult: float = difficulty.get_value("gold") * (CHAMPION_GOLD if champion else 1.0)
 	var magic_find: float = difficulty.get_value("magic_find") + (1.0 if champion else 0.0)
 	var drops: Array[Dictionary] = Loot.roll_enemy_drops(data, level, gold_mult, magic_find)
@@ -979,10 +1427,21 @@ func _die() -> void:
 		_poison_fx.emitting = false
 	_refresh_overlay()
 	_attacking = false
-	var xp: int = get_xp_reward()
-	player_stats.add_xp(xp)
-	floating_text.spawn(global_position + Vector3.UP * 300.0, "+%d exp" % xp, Color(0.75, 0.65, 1.0), 18)
-	_drop_loot.call_deferred()
+	remove_from_group("prey")
+	# Lo que mata un lobo (o algo que no sea el jugador) no da experiencia ni botin.
+	if not is_instance_valid(_killer):
+		var xp: int = roundi(get_xp_reward() * (0.25 if summoned else 1.0))
+		if xp > 0:
+			player_stats.add_xp(xp)
+			floating_text.spawn(global_position + Vector3.UP * 300.0, "+%d exp" % xp, Color(0.75, 0.65, 1.0), 18)
+		_drop_loot.call_deferred()
+	if data.body == EnemyData.Body.BONE or data.body == EnemyData.Body.UNDEAD:
+		_remember_fallen()
+	if data.ghostly:
+		_fade_ghost(1.2)
+	if data.hover_bob > 0.0:
+		# Lo que volaba cae al piso.
+		create_tween().tween_property(model_root, "position:y", 0.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	if _flinch_tween:
 		_flinch_tween.kill()
 	model_root.rotation.x = 0.0
@@ -1006,6 +1465,44 @@ func _die() -> void:
 
 	# El cuerpo queda unos segundos y despues se hunde en el piso.
 	await get_tree().create_timer(CORPSE_TIME, false).timeout
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
 	var tween := create_tween()
 	tween.tween_property(self, "position:y", position.y - 300.0, 1.5)
 	tween.tween_callback(queue_free)
+
+
+# Lo anota para que un nigromante cercano lo pueda levantar.
+func _remember_fallen() -> void:
+	var now: float = Time.get_ticks_msec() / 1000.0
+	fallen = fallen.filter(func(entry: Dictionary) -> bool: return now - entry.time < FALLEN_TIME)
+	fallen.append({"position": global_position, "data": data, "level": level, "time": now, "corpse": weakref(self)})
+
+
+## Criaturas de la noche al salir el sol: se deshacen en el lugar (sin botin).
+func _vanish() -> void:
+	dead = true
+	state = State.DEAD
+	remove_from_group("enemies")
+	remove_from_group("ambushers")
+	remove_from_group("prey")
+	collision_layer = 0
+	collision_mask = 0
+	nav_agent.avoidance_enabled = false
+	if _hitbox:
+		_hitbox.collision_layer = 0
+	for node in _aura:
+		node.queue_free()
+	_aura.clear()
+	Effects.spirit_wisps(get_parent(), global_position + Vector3.UP * (_top * 0.5), data.ghost_color if data.ghostly else Color(0.4, 0.38, 0.45), 16, body_radius() * 2.0)
+	if data.ghostly:
+		_fade_ghost(0.8)
+	var tween := create_tween()
+	tween.tween_property(model_root, "scale", model_root.scale * 0.05, 0.9).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free)
+
+
+func _fade_ghost(duration: float) -> void:
+	for material in _ghost_materials:
+		var tween := create_tween()
+		tween.tween_method(func(value: float) -> void: material.set_shader_parameter("fade", value), 1.0, 0.0, duration)

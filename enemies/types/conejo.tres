@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/conejo.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Conejo"
+model_scale = 0.75
+model_offset_y = 0.0
+collision_radius = 35.0
+pack_size = Vector2i(1, 3)
+idle_animation = "idle"
+walk_animations = Array[String](["walk"])
+run_animation = "walk"
+run_animation_speed = 2.2
+death_animation = "death"
+passive = true
+flee_range = 700.0
+max_health = 6.0
+min_damage = 0
+max_damage = 0
+speed = 470.0
+detection_range = 0.0
+xp_reward = 1
+gold_min = 0
+gold_max = 0

@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/nigromante.tscn" id="2_model"]
+[ext_resource type="Resource" path="res://enemies/types/esqueleto.tres" id="3_escort"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Nigromante"
+model_offset_y = 0.0
+collision_radius = 60.0
+pack_size = Vector2i(1, 1)
+idle_animation = "idle"
+walk_animations = Array[String](["walk"])
+run_animation = "run"
+attack_animations = Array[String](["attack_staff"])
+cast_animation = "pray"
+death_animation = "death"
+hit_animations = Array[String](["hit"])
+extra_death_animations = Array[String](["death_b"])
+role = 3
+keep_distance = 700.0
+escort_count = Vector2i(1, 2)
+shoots = true
+projectile_speed = 1500.0
+spell_color = Color(0.65, 0.35, 1, 1)
+max_health = 90.0
+min_damage = 10
+max_damage = 16
+defense = 5
+speed = 290.0
+attack_cooldown = 2.0
+attack_range = 1000.0
+detection_range = 1500.0
+attack_damage_type = 1
+attack_conversion = 1.0
+resist_magic = 30.0
+death_sound = "necro_death"
+xp_reward = 95
+gold_min = 20
+gold_max = 60
+escorts = Array[ExtResource("1_data")]([ExtResource("3_escort")])

@@ -113,6 +113,8 @@ func _set_lift(value: float) -> void:
 
 func _enemy_nearby() -> bool:
 	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.data.passive:
+			continue
 		if enemy.global_position.distance_to(character.global_position) < SAFE_DISTANCE:
 			return true
 	return false

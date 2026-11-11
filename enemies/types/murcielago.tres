@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/murcielago.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Murciélago"
+model_offset_y = 230.0
+tint = Color(0.62, 0.55, 0.6, 1)
+collision_radius = 40.0
+pack_size = Vector2i(4, 7)
+idle_animation = "BatArmature|Bat_Flying"
+walk_animations = Array[String](["BatArmature|Bat_Flying"])
+attack_animations = Array[String](["BatArmature|Bat_Attack", "BatArmature|Bat_Attack2"])
+death_animation = "BatArmature|Bat_Death"
+hit_animations = Array[String](["BatArmature|Bat_Hit"])
+night_only = true
+hover_bob = 28.0
+erratic = true
+max_health = 14.0
+min_damage = 2
+max_damage = 4
+speed = 520.0
+attack_cooldown = 0.9
+attack_range = 170.0
+detection_range = 1300.0
+aggro_sound = "bat_squeak"
+attack_sound = "bat_squeak"
+xp_reward = 6
+gold_min = 0
+gold_max = 1

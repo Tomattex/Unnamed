@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/esqueleto_chaman.tscn" id="2_model"]
+[ext_resource type="Resource" path="res://enemies/types/esqueleto.tres" id="3_escort"]
+[ext_resource type="Resource" path="res://enemies/types/esqueleto_guerrero.tres" id="4_escort"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Chamán esqueleto"
+model_offset_y = 0.0
+pack_size = Vector2i(1, 1)
+idle_animation = "idle_priest"
+walk_animations = Array[String](["walk_priest"])
+run_animation = "run_priest"
+attack_animations = Array[String](["attack_1h_b"])
+cast_animation = "cast_heal"
+death_animation = "death"
+hit_animations = Array[String](["hit"])
+extra_death_animations = Array[String](["death_b"])
+body = 1
+crumbles = true
+spawn_animation = "no_muerto/levantarse"
+role = 1
+keep_distance = 600.0
+escort_count = Vector2i(2, 3)
+shoots = true
+projectile_speed = 1500.0
+spell_color = Color(0.45, 1, 0.5, 1)
+max_health = 60.0
+min_damage = 7
+max_damage = 12
+defense = 3
+speed = 270.0
+attack_cooldown = 2.2
+attack_range = 950.0
+detection_range = 1400.0
+attack_damage_type = 1
+attack_conversion = 1.0
+resist_poison = 75.0
+resist_fire = -20.0
+resist_magic = 20.0
+xp_reward = 60
+gold_min = 8
+gold_max = 25
+escorts = Array[ExtResource("1_data")]([ExtResource("3_escort"), ExtResource("3_escort"), ExtResource("4_escort")])

@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/espectro.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Espectro"
+model_offset_y = 45.0
+collision_radius = 60.0
+pack_size = Vector2i(1, 2)
+idle_animation = "idle"
+walk_animations = Array[String](["walk"])
+walk_animation_speed = 0.6
+attack_animations = Array[String](["attack_staff"])
+death_animation = "death_b"
+hit_animations = Array[String](["hit"])
+body = 4
+night_only = true
+hover_bob = 14.0
+ghostly = true
+ghost_color = Color(0.55, 0.8, 1, 1)
+max_health = 75.0
+min_damage = 8
+max_damage = 14
+defense = 18
+speed = 280.0
+attack_cooldown = 1.6
+attack_range = 230.0
+detection_range = 1400.0
+attack_damage_type = 1
+attack_conversion = 1.0
+resist_magic = -25.0
+resist_poison = 75.0
+resist_fire = -10.0
+aggro_sound = "ghost_moan"
+attack_sound = "ghost_breath"
+death_sound = "ghost_scream"
+xp_reward = 50
+gold_min = 3
+gold_max = 15

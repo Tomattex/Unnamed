@@ -41,6 +41,16 @@ const SOUNDS := {
 	"wolf_death": ["res://sounds/creatures/wolf/growl2.ogg"],
 	"spider_chitter": ["res://sounds/creatures/spider/chitter01.ogg", "res://sounds/creatures/spider/chitter02.ogg", "res://sounds/creatures/spider/chitter04.ogg"],
 	"spider_attack": ["res://sounds/creatures/spider/hiss.ogg", "res://sounds/creatures/spider/chirp.ogg"],
+	"bear_roar": ["res://sounds/creatures/oso/roar_01.ogg", "res://sounds/creatures/oso/roar_03.ogg"],
+	"bear_attack": ["res://sounds/creatures/oso/roar_02.ogg", "res://sounds/creatures/oso/attack_01.ogg"],
+	"bear_death": ["res://sounds/creatures/oso/die_01.ogg"],
+	"boar_grunt": ["res://sounds/creatures/jabali/grunt_01.ogg", "res://sounds/creatures/jabali/grunt_02.ogg", "res://sounds/creatures/jabali/grunt_03.ogg"],
+	"boar_death": ["res://sounds/creatures/jabali/die_02.ogg"],
+	"bat_squeak": ["res://sounds/creatures/murcielago/cute_02.ogg", "res://sounds/creatures/murcielago/cute_05.ogg", "res://sounds/creatures/murcielago/cute_07.ogg"],
+	"ghost_moan": ["res://sounds/creatures/espectro/ooh.ogg"],
+	"ghost_breath": ["res://sounds/creatures/espectro/breath.ogg", "res://sounds/creatures/espectro/breath_02.ogg"],
+	"ghost_scream": ["res://sounds/creatures/espectro/scream_01.ogg"],
+	"necro_death": ["res://sounds/creatures/nigromante/die_03.ogg"],
 	"gem_socket": ["res://sounds/interact/gems/gem1.ogg", "res://sounds/interact/gems/gem3.ogg", "res://sounds/interact/gems/gem5.ogg"],
 }
 

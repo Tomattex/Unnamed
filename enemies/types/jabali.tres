@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://enemies/models/jabali.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+name = "Jabalí"
+model_offset_y = 0.0
+collision_radius = 75.0
+pack_size = Vector2i(1, 3)
+idle_animation = "idle"
+walk_animations = Array[String](["walk"])
+attack_animations = Array[String](["attack"])
+death_animation = "death"
+run_animation = "run"
+walk_animation_speed = 0.7
+max_health = 55.0
+min_damage = 6
+max_damage = 11
+defense = 4
+speed = 380.0
+attack_cooldown = 1.3
+attack_range = 210.0
+detection_range = 1100.0
+aggro_sound = "boar_grunt"
+attack_sound = "boar_grunt"
+death_sound = "boar_death"
+xp_reward = 24
+gold_min = 0
+gold_max = 2
