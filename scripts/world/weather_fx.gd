@@ -5,6 +5,7 @@ extends Node3D
 ## y los sonidos de lluvia y viento. El cielo y el sol los oscurece
 ## day_night.gd con weather.overcast. Ademas, con cualquier clima, neblina
 ## baja al amanecer (y de noche en el cementerio) que se levanta de a poco.
+## En el desierto no llueve y en la montaña, en vez de lluvia, nieva.
 
 @export var environment_path: NodePath
 
@@ -32,10 +33,17 @@ const MIST_HEIGHT: float = 200.0
 const MIST_HEIGHT_DENSITY: float = 0.0003
 ## Cuanto tarda la neblina en llegar o irse del todo (segundos reales).
 const MIST_FADE: float = 12.0
+## Cuanto tarda en dejar de llover (o pasar a nieve) al entrar al desierto (o a la montaña).
+const ZONE_FADE: float = 4.0
+const SNOW_AMOUNT: int = 1800
 
 @onready var world_environment: WorldEnvironment = get_node_or_null(environment_path)
 
 var _rain: GPUParticles3D
+var _snow: GPUParticles3D
+## 1 en el desierto (no llueve), 1 en la montaña (nieva); pasan de a poco.
+var _dry: float = 0.0
+var _snowy: float = 0.0
 var _rain_player: AudioStreamPlayer
 var _heavy_rain_player: AudioStreamPlayer
 var _wind_player: AudioStreamPlayer
@@ -49,6 +57,8 @@ var mist: float = 0.0
 func _ready() -> void:
 	_rain = _make_rain()
 	add_child(_rain)
+	_snow = _make_snow()
+	add_child(_snow)
 	_rain_player = _loop_player(RAIN_SOUND)
 	_heavy_rain_player = _loop_player(HEAVY_RAIN_SOUND)
 	_wind_player = _loop_player(WIND_SOUND)
@@ -66,33 +76,42 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var player: Node3D = get_tree().get_first_node_in_group("player")
+	var zone: String = ""
 	if player:
 		_rain.global_position = player.global_position + Vector3.UP * RAIN_HEIGHT
-	_rain.amount_ratio = weather.rain
-	_rain.emitting = weather.rain > 0.01
+		_snow.global_position = player.global_position + Vector3.UP * RAIN_HEIGHT
+		zone = music.zone_at(player.global_position)
+	_dry = move_toward(_dry, 1.0 if zone == "desierto" else 0.0, delta / ZONE_FADE)
+	_snowy = move_toward(_snowy, 1.0 if zone == "montana" else 0.0, delta / ZONE_FADE)
+	var falling: float = weather.rain * (1.0 - _dry)
+	var rain: float = falling * (1.0 - _snowy)
+	_rain.amount_ratio = rain
+	_rain.emitting = rain > 0.01
+	_snow.amount_ratio = falling * _snowy
+	_snow.emitting = falling * _snowy > 0.01
 
 	mist = move_toward(mist, mist_target(player.global_position if player else Vector3.ZERO), delta / MIST_FADE)
 	if world_environment and world_environment.environment:
 		var environment: Environment = world_environment.environment
-		var density: float = MAX_FOG_DENSITY * (weather.fog + weather.rain * 0.25) + MIST_DENSITY * mist
+		var density: float = MAX_FOG_DENSITY * (weather.fog + falling * 0.25) + MIST_DENSITY * mist
 		environment.fog_enabled = density > 0.000005
 		environment.fog_density = density
 		environment.fog_height = MIST_HEIGHT
 		environment.fog_height_density = MIST_HEIGHT_DENSITY * mist
 		var light: float = lerpf(0.25, 1.0, world_time.get_daylight())
-		var weather_share: float = weather.fog + weather.rain * 0.25
+		var weather_share: float = weather.fog + falling * 0.25
 		var mist_share: float = mist / maxf(mist + weather_share, 0.001)
 		# La neblina del amanecer es clara aunque todavia haya poco sol.
 		environment.fog_light_color = FOG_COLOR.lerp(MIST_COLOR, mist_share) * lerpf(light, maxf(light, 0.6), mist_share)
 		environment.fog_sky_affect = 0.5
 
 	# Llovizna con la lluvia suave; en la tormenta entra la fuerte.
-	var heavy: float = clampf((weather.rain - 0.5) * 2.0, 0.0, 1.0)
-	_set_loop_volume(_rain_player, weather.rain * (1.0 - heavy * 0.7))
-	_set_loop_volume(_heavy_rain_player, weather.rain * heavy)
-	_set_loop_volume(_wind_player, maxf(weather.fog * 0.6, weather.rain * weather.overcast * 0.8))
+	var heavy: float = clampf((rain - 0.5) * 2.0, 0.0, 1.0)
+	_set_loop_volume(_rain_player, rain * (1.0 - heavy * 0.7))
+	_set_loop_volume(_heavy_rain_player, rain * heavy)
+	_set_loop_volume(_wind_player, maxf(weather.fog * 0.6, falling * weather.overcast * 0.8))
 
-	if weather.state == weather.State.STORM and weather.rain > 0.7:
+	if weather.state == weather.State.STORM and rain > 0.7:
 		_next_lightning -= delta
 		if _next_lightning <= 0.0:
 			_next_lightning = randf_range(7.0, 18.0)
@@ -140,6 +159,47 @@ func _make_rain() -> GPUParticles3D:
 	material.disable_receive_shadows = true
 	drop.material = material
 	particles.draw_pass_1 = drop
+	return particles
+
+
+func _make_snow() -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = SNOW_AMOUNT
+	particles.lifetime = 4.0
+	particles.preprocess = 4.0
+	particles.visibility_aabb = AABB(Vector3(-RAIN_AREA, -RAIN_HEIGHT - 200.0, -RAIN_AREA), Vector3(RAIN_AREA * 2.0, RAIN_HEIGHT + 400.0, RAIN_AREA * 2.0))
+	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	particles.emitting = false
+
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(RAIN_AREA, 40.0, RAIN_AREA)
+	process.direction = Vector3(0.3, -1.0, 0.1)
+	process.spread = 18.0
+	process.initial_velocity_min = 300.0
+	process.initial_velocity_max = 440.0
+	process.gravity = Vector3.ZERO
+	# Copos que van y vienen un poco al caer.
+	process.turbulence_enabled = true
+	process.turbulence_noise_strength = 2.0
+	process.turbulence_noise_scale = 6.0
+	process.turbulence_influence_min = 0.05
+	process.turbulence_influence_max = 0.12
+	process.scale_min = 0.6
+	process.scale_max = 1.3
+	particles.process_material = process
+
+	var flake := QuadMesh.new()
+	flake.size = Vector2(16.0, 16.0)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_texture = Effects.SOFT
+	material.albedo_color = Color(0.95, 0.97, 1.0, 0.85)
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.disable_receive_shadows = true
+	flake.material = material
+	particles.draw_pass_1 = flake
 	return particles
 
 

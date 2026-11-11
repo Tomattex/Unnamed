@@ -27,13 +27,17 @@ const LOOPS := {
 	"pradera": {"birds": 0.75, "crows": 0.0, "wind": 0.2},
 	"cementerio": {"birds": 0.0, "crows": 0.7, "wind": 0.3},
 	"ruinas": {"birds": 0.12, "crows": 0.25, "wind": 0.65},
+	"pantano": {"birds": 0.0, "crows": 0.45, "wind": 0.12},
+	"montana": {"birds": 0.0, "crows": 0.0, "wind": 1.0},
+	"costa": {"birds": 0.3, "crows": 0.0, "wind": 0.55},
+	"desierto": {"birds": 0.0, "crows": 0.08, "wind": 0.85},
 }
 ## Volumen maximo de cada sonido de fondo (dB, con el volumen 1).
 const LOOP_DB := {"birds": -9.0, "crows": -12.0, "wind": -14.0}
 ## Sonidos sueltos: en que zonas, si de dia o de noche, y cada cuantos segundos.
 const ONE_SHOTS := [
-	{"path": OWL, "zones": ["bosque", "pradera", "cementerio", "aldea"], "night": true, "every": Vector2(14.0, 34.0), "db": -8.0},
-	{"path": CAW, "zones": ["cementerio", "ruinas", "bosque"], "night": false, "every": Vector2(9.0, 24.0), "db": -10.0},
+	{"path": OWL, "zones": ["bosque", "pradera", "cementerio", "aldea", "pantano"], "night": true, "every": Vector2(14.0, 34.0), "db": -8.0},
+	{"path": CAW, "zones": ["cementerio", "ruinas", "bosque", "pantano", "desierto"], "night": false, "every": Vector2(9.0, 24.0), "db": -10.0},
 ]
 ## Cuanto tarda un sonido de fondo en fundirse del todo (segundos).
 const FADE_TIME: float = 4.0

@@ -10,7 +10,7 @@ extends Node
 signal portal_discovered(id: String, display_name: String)
 
 ## El mundo es un cuadrado de WORLD_SIZE centrado en el origen (ver world/build_world.gd).
-const WORLD_SIZE: float = 20000.0
+const WORLD_SIZE: float = 36000.0
 const FOG_RES: int = 256
 const REVEAL_RADIUS: float = 1500.0
 const UPDATE_INTERVAL: float = 0.2
@@ -208,6 +208,7 @@ func to_save() -> Dictionary:
 	_ensure_fog()
 	return {
 		"fog": Marshalls.raw_to_base64(_fog.save_png_to_buffer()),
+		"world_size": WORLD_SIZE,
 		"portals": discovered_portals.duplicate(),
 	}
 
@@ -221,5 +222,16 @@ func from_save(data: Dictionary) -> void:
 	var image := Image.new()
 	if image.load_png_from_buffer(Marshalls.base64_to_raw(encoded)) == OK and image.get_width() == FOG_RES:
 		image.convert(Image.FORMAT_LA8)
+		# Partidas de cuando el mundo era mas chico (20000): lo explorado
+		# queda en el centro del mapa nuevo.
+		var old_size: float = data.get("world_size", 20000.0)
+		if not is_equal_approx(old_size, WORLD_SIZE):
+			var side: int = roundi(FOG_RES * old_size / WORLD_SIZE)
+			image.resize(side, side, Image.INTERPOLATE_BILINEAR)
+			_ensure_fog()
+			var offset: int = (FOG_RES - side) / 2
+			_fog.blit_rect(image, Rect2i(0, 0, side, side), Vector2i(offset, offset))
+			_fog_dirty = true
+			return
 		_fog = image
 		_fog_dirty = true

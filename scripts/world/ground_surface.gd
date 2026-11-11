@@ -10,7 +10,7 @@ enum Kind { GRASS, DIRT, STONE }
 
 const MASK := "res://world/terrain/grass_mask.png"
 ## Mismo tamaño de mundo que world/build_world.gd.
-const WORLD_SIZE: float = 20000.0
+const WORLD_SIZE: float = 36000.0
 const STEPS := {
 	Kind.GRASS: "res://sounds/ambient/footsteps/pasto_%d.ogg",
 	Kind.DIRT: "res://sounds/ambient/footsteps/tierra_%d.ogg",

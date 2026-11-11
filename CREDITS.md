@@ -114,6 +114,8 @@ lo dejamos anotado.
 | Tierra de los caminos (Brown Mud 02) | Rob Tuytel | https://polyhaven.com/a/brown_mud_02 |
 | Adoquines (Cobblestone Floor 001) | Rob Tuytel | https://polyhaven.com/a/cobblestone_floor_001 |
 | Piedra (Rocks Ground 02) | Rob Tuytel | https://polyhaven.com/a/rocks_ground_02 |
+| Arena del desierto y la costa (Aerial Sand) | Rob Tuytel | https://polyhaven.com/a/aerial_sand |
+| Nieve de la montaña (Snow 02) | Rob Tuytel | https://polyhaven.com/a/snow_02 |
 
 ### Naturaleza (`assets/nature/`)
 
@@ -213,3 +215,4 @@ CC0 o dominio público. Los de antes (golpes, interfaz, pasos y hechizos de
 | Cuervos (`crows.ogg`, "Crows singing", en mono) | IgnasD | https://opengameart.org/content/crows-singing (CC0) |
 | Graznido suelto (`crow_caw.ogg`, "Crow caw", en mono) | zeroisnotnull | https://opengameart.org/content/crow-caw (CC0) |
 | Búho (`owl.ogg`, "Barred Owl, Yellowstone National Park", en mono) | National Park Service | https://commons.wikimedia.org/wiki/File:Barred_Owl,_Yellowstone_National_Park.oga (dominio público) |
+| Río y olas del mar (`sounds/ambient/water/rio.wav`, `olas.wav`) | hechos para este juego (ruido filtrado y burbujas generados por código) | CC0 |

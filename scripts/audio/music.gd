@@ -15,6 +15,11 @@ const TRACKS := {
 	"cementerio": "res://sounds/music/cementerio.ogg",
 	"ruinas": "res://sounds/music/ruinas.ogg",
 	"pradera": "res://sounds/music/pradera.ogg",
+	# Las regiones de afuera usan por ahora los temas de las de adentro.
+	"pantano": "res://sounds/music/cementerio.ogg",
+	"montana": "res://sounds/music/ruinas.ogg",
+	"costa": "res://sounds/music/pradera.ogg",
+	"desierto": "res://sounds/music/ruinas.ogg",
 	"combate": "res://sounds/music/combate.ogg",
 }
 ## Zonas del mapa (centro x, z y radio, los mismos que usa el mundo).
@@ -23,6 +28,10 @@ const ZONES := {
 	"bosque": WORLD.FOREST,
 	"cementerio": WORLD.GRAVEYARD,
 	"ruinas": WORLD.RUINS,
+	"pantano": WORLD.SWAMP,
+	"montana": WORLD.MOUNTAIN,
+	"costa": WORLD.COAST,
+	"desierto": WORLD.DESERT,
 }
 const FADE_TIME: float = 2.5
 const VOLUME_DB: float = -6.0

@@ -397,10 +397,14 @@ static func body_hit(parent: Node, position: Vector3, body: int, size: float, bi
 	tween.tween_callback(mark.queue_free)
 	_marks.append(mark)
 	while _marks.size() > MAX_MARKS:
-		var old: Node = _marks.pop_front()
+		var old = _marks.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
-	_marks = _marks.filter(func(node: Node) -> bool: return is_instance_valid(node))
+	# Sin filter con el tipo en el parametro: una mancha ya borrada no
+	# se puede pasar como Node y el filtro entero falla.
+	for i in range(_marks.size() - 1, -1, -1):
+		if not is_instance_valid(_marks[i]):
+			_marks.remove_at(i)
 
 
 ## Particulas de un solo disparo que se borran solas al terminar.

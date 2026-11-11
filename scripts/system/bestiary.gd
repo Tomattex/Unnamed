@@ -4,7 +4,7 @@ extends Node
 ## - Bestiario: por cada tipo de enemigo (enemies/types/*.tres) anota si se
 ##   vio, cuantos se mataron, cuantos campeones y el nivel mas alto visto.
 ## - Regiones: derrotar a un campeon en cada region (Bosque, Pradera,
-##   Cementerio y Ruinas) completa la dificultad y desbloquea la siguiente
+##   Cementerio, Ruinas, Pantano, Costa, Desierto y Montaña) completa la dificultad y desbloquea la siguiente
 ##   (save_game lo guarda en el perfil).
 ## Escucha a los enemigos desde afuera (senal died de enemi.gd), asi que no
 ## hace falta tocarlos; los carteles los muestra el HUD con las senales.
@@ -16,7 +16,8 @@ signal difficulty_completed(index: int)
 
 const TYPES_DIR := "res://enemies/types"
 ## Region (nombre de la zona sin numeros) -> como se nombra en los avisos.
-const REGIONS := {"Bosque": "el Bosque", "Pradera": "la Pradera", "Cementerio": "el Cementerio", "Ruinas": "las Ruinas"}
+const REGIONS := {"Bosque": "el Bosque", "Pradera": "la Pradera", "Cementerio": "el Cementerio", "Ruinas": "las Ruinas",
+		"Pantano": "la Ciénaga", "Costa": "la Costa", "Desierto": "el Desierto", "Montaña": "las Cumbres"}
 ## A esta distancia del jugador un enemigo cuenta como visto.
 const SEEN_RANGE: float = 1600.0
 

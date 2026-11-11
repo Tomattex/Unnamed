@@ -14,7 +14,7 @@ const SPLAT_B := "res://world/terrain/splat_b.png"
 const GRASS_TEXTURE := "res://assets/terrain/grass_albedo.jpg"
 const SHADER := preload("res://world/terrain/grass.gdshader")
 ## Mismo tamaño de mundo que world/build_world.gd.
-const WORLD_SIZE: float = 20000.0
+const WORLD_SIZE: float = 36000.0
 ## Lado de cada parcela.
 const CHUNK: float = 1000.0
 ## Hasta donde hay pasto alrededor del punto que mira la camara, y desde

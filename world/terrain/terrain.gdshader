@@ -6,7 +6,7 @@ shader_type spatial;
 // mezcla con una segunda muestra mas grande para que no se note la repeticion.
 
 uniform sampler2D splat_a : hint_default_black, filter_linear;   // r tierra, g adoquin, b bosque, a musgo
-uniform sampler2D splat_b : hint_default_black, filter_linear;   // r piedra, g variacion de tono
+uniform sampler2D splat_b : hint_default_black, filter_linear;   // r piedra, g variacion de tono, b arena, a nieve
 uniform sampler2D grass_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D dirt_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -19,10 +19,16 @@ uniform sampler2D moss_albedo : source_color, filter_linear_mipmap_anisotropic, 
 uniform sampler2D moss_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rocky_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rocky_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D sand_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D sand_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D snow_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D snow_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 
 uniform float world_size = 20000.0;
 uniform float tile_size = 420.0;
 uniform vec3 grass_tint : source_color = vec3(0.78, 0.84, 0.62);
+// Pantano (x, z, radio): todo mas oscuro y verdoso.
+uniform vec3 swamp_area = vec3(0.0, 0.0, 0.0);
 
 varying vec3 world_pos;
 
@@ -66,6 +72,16 @@ void fragment() {
 	col = mix(col, c, w);
 	nrm = mix(nrm, texture(rocky_normal, uv * 0.7).rgb, w);
 
+	c = sample_albedo(sand_albedo, uv * 0.8) * vec3(1.06, 0.92, 0.74);
+	w = blend_weight(b.b, c);
+	col = mix(col, c, w);
+	nrm = mix(nrm, texture(sand_normal, uv * 0.8).rgb, w);
+
+	c = sample_albedo(snow_albedo, uv * 0.7);
+	w = blend_weight(b.a, c);
+	col = mix(col, c * vec3(0.95, 0.97, 1.0), w);
+	nrm = mix(nrm, texture(snow_normal, uv * 0.7).rgb, w);
+
 	c = sample_albedo(dirt_albedo, uv * 1.2);
 	w = blend_weight(a.r, c);
 	col = mix(col, c * vec3(0.85, 0.8, 0.74), w);
@@ -78,6 +94,10 @@ void fragment() {
 
 	// Variacion de tono a gran escala (manchas mas claras y mas oscuras).
 	col *= mix(0.8, 1.12, b.g);
+	if (swamp_area.z > 0.0) {
+		float swamp = 1.0 - smoothstep(swamp_area.z * 0.75, swamp_area.z * 1.05, distance(world_pos.xz, swamp_area.xy));
+		col *= mix(vec3(1.0), vec3(0.6, 0.68, 0.52), swamp);
+	}
 
 	ALBEDO = col;
 	NORMAL_MAP = nrm;

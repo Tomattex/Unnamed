@@ -1,11 +1,17 @@
 extends SceneTree
 
 ## Arma el mundo (world/mundo.tscn) con los assets libres de assets/:
-## piso con mapas de mezcla (caminos, adoquines, bosque, musgo, piedra), las
-## piezas de cada zona con su colision, las zonas de enemigos, los portales,
-## los cofres, barriles y cajones rompibles, santuarios, luces de noche, el
-## mapa del pasto, los nombres de cada lugar para el mapa y la navegacion
-## horneada.
+## piso con mapas de mezcla (caminos, adoquines, bosque, musgo, piedra, arena
+## y nieve), las piezas de cada zona con su colision, las zonas de enemigos,
+## los portales, los cofres, barriles y cajones rompibles, santuarios, luces
+## de noche, el mapa del pasto, los nombres de cada lugar para el mapa y la
+## navegacion horneada.
+## En el centro estan la aldea (con muralla, portones, guardias y aldeanos),
+## el bosque, el cementerio, las ruinas y las praderas; alrededor, cuatro
+## regiones mas: la montaña nevada al norte, la costa y el mar al este, el
+## desierto al sur y el pantano al oeste. Dos rios bajan de la montaña (al mar
+## y al pantano) y se cruzan por puentes donde pasan los caminos. Los eventos
+## del camino (scripts/world/road_events.gd) usan los caminos de aca.
 ## Es deterministico (semilla fija): correrlo de nuevo da el mismo mundo.
 ##
 ##   godot --headless --path . --script res://world/build_world.gd
@@ -20,11 +26,12 @@ const SPLAT_B := "res://world/terrain/splat_b.png"
 const GRASS_MASK := "res://world/terrain/grass_mask.png"
 const SEED: int = 20261029
 
-const SIZE: float = 20000.0
+const SIZE: float = 36000.0
 const HALF: float = SIZE / 2.0
-## Hasta donde se puede caminar (mas alla hay bosque cerrado y paredes invisibles).
-const WALK_LIMIT: float = 9200.0
-const SPLAT_RES: int = 1024
+## Hasta donde se puede caminar (mas alla hay bosque cerrado, el mar al este y
+## paredes invisibles).
+const WALK_LIMIT: float = 17200.0
+const SPLAT_RES: int = 1536
 const PATH_WIDTH: float = 230.0
 
 const PROP_SCRIPT := preload("res://scripts/world/prop.gd")
@@ -37,6 +44,11 @@ const BREAKABLE_SCRIPT := "res://scripts/world/breakable.gd"
 const SHRINE_SCRIPT := "res://scripts/world/shrine.gd"
 const NIGHT_LIGHT_SCRIPT := "res://scripts/world/night_light.gd"
 const GRASS_SCRIPT := "res://scripts/world/grass_field.gd"
+const WATER_SHADER := "res://world/terrain/water.gdshader"
+const WATER_SOUNDS_SCRIPT := "res://scripts/world/water_sounds.gd"
+const GUARD_SCRIPT := "res://scripts/npc/guard.gd"
+const VILLAGER_SCRIPT := "res://scripts/npc/villager.gd"
+const EVENTS_SCRIPT := "res://scripts/world/road_events.gd"
 
 const N := "res://assets/nature/"
 const P := "res://assets/props/"
@@ -75,6 +87,9 @@ const TORCH_HEIGHT: float = 300.0
 const GRAVESTONES := ["gravestone-bevel", "gravestone-broken", "gravestone-cross", "gravestone-cross-large", "gravestone-decorative", "gravestone-round", "gravestone-wide", "gravestone-roof"]
 
 const FOLIAGE_TINT := Color(0.78, 0.82, 0.74)
+const SNOW_TINT := Color(0.86, 0.9, 0.96)
+const SWAMP_TINT := Color(0.55, 0.62, 0.48)
+const SAND_TINT := Color(1.0, 0.84, 0.62)
 const VILLAGE_TINT := Color(0.86, 0.82, 0.78)
 
 var _rng := RandomNumberGenerator.new()
@@ -86,6 +101,22 @@ var _occupied: Array[Vector3] = []
 var _scene_cache: Dictionary = {}
 var _splat_a: Image
 var _splat_b: Image
+## Lo nuevo (regiones de afuera, rios, gente) usa su propio generador, asi
+## no cambia del todo lo que ya estaba.
+var _rng2 := RandomNumberGenerator.new()
+## Tramos de los caminos y de los rios repartidos en una grilla (las
+## distancias se piden millones de veces al pintar el piso).
+var _path_grid: Dictionary = {}
+var _river_grid: Dictionary = {}
+## Muestras de cada rio ya suavizado: [{"points": PackedVector2Array, "widths": PackedFloat32Array}].
+var _river_lines: Array = []
+## Puentes: centro (x, z), direccion del camino y largo.
+var _bridges: Array = []
+## Charcos del pantano: (x, z, radio).
+var _pools: Array[Vector3] = []
+## Portones de la muralla: centro, direccion a lo largo del muro y hacia afuera.
+var _gates: Array = []
+var _fort_bounds: Dictionary = {}
 
 ## Caminos de tierra: listas de puntos (x, z).
 var _paths: Array = [
@@ -94,19 +125,43 @@ var _paths: Array = [
 	[Vector2(0, -200), Vector2(200, -1800), Vector2(500, -3500), Vector2(-200, -5200), Vector2(-500, -6400), Vector2(0, -7300)],
 	[Vector2(-4300, -1300), Vector2(-4000, -3400), Vector2(-3000, -5200), Vector2(-1600, -6300), Vector2(-500, -6400)],
 	[Vector2(0, -200), Vector2(400, 1500), Vector2(-300, 3200), Vector2(600, 5200)],
+	# Caminos a las regiones de afuera: montaña (norte), costa (este),
+	# desierto (sur) y pantano (oeste), y dos sendas que cruzan los rios.
+	[Vector2(0, -7300), Vector2(-300, -9300), Vector2(-900, -11200), Vector2(-600, -12700), Vector2(-500, -14200)],
+	[Vector2(2800, -1900), Vector2(5200, -1100), Vector2(8000, -1300), Vector2(10500, -900), Vector2(12600, -700), Vector2(13900, -200)],
+	[Vector2(600, 5200), Vector2(1300, 7600), Vector2(800, 10200), Vector2(1500, 12100), Vector2(1300, 13800)],
+	[Vector2(-5600, -2000), Vector2(-8000, -700), Vector2(-10300, 500), Vector2(-12200, 1500), Vector2(-13400, 1900)],
+	[Vector2(4900, -3900), Vector2(7600, -5200), Vector2(10300, -6100), Vector2(12600, -6600)],
+	[Vector2(-4000, -3400), Vector2(-7200, -5600), Vector2(-10100, -6600), Vector2(-12800, -7400)],
 ]
 
 ## Zonas: centro (x, z) y radio.
-const VILLAGE := Vector3(0, -200, 1500)
+const VILLAGE := Vector3(0, -200, 2500)
 const FOREST := Vector3(-6200, -2700, 3300)
 const GRAVEYARD := Vector3(5600, -4800, 2100)
 const RUINS := Vector3(0, -7800, 1900)
+const SWAMP := Vector3(-13300, 1800, 3500)
+const MOUNTAIN := Vector3(-500, -14000, 3600)
+const COAST := Vector3(13000, -800, 3300)
+const DESERT := Vector3(1400, 13600, 3600)
+## Muralla de la aldea: cuadrado de este medio lado alrededor del centro.
+const WALL_HALF: float = 2300.0
+## Orilla del mar del este (x; ondula un poco con el ruido).
+const SHORE_X: float = 15300.0
+## Rios: ancho y puntos (x, z) desde la naciente, que empieza fuera de lo
+## caminable para que no se pueda rodear.
+const RIVERS := [
+	{"name": "RioFrio", "width": 640.0, "points": [Vector2(5200, -17800), Vector2(6600, -13200), Vector2(9600, -10200), Vector2(10600, -6400), Vector2(9900, -3600), Vector2(10900, -1500), Vector2(13200, 1700), Vector2(15900, 2900)]},
+	{"name": "RioTurbio", "width": 700.0, "points": [Vector2(-7200, -17800), Vector2(-9200, -12600), Vector2(-10300, -8200), Vector2(-10000, -3600), Vector2(-10400, 1200), Vector2(-11700, 4400), Vector2(-12600, 6400)]},
+]
+const BRIDGE_WIDTH: float = 440.0
 
 
 func _initialize() -> void:
 	# Que el guardado del jugador no se toque mientras se arma el mundo.
 	root.get_node("save_game").save_path = "user://build_world_descartable.json"
 	_rng.seed = SEED
+	_rng2.seed = SEED + 7
 	_noise.seed = SEED
 	_noise.frequency = 0.0009
 	_noise.fractal_octaves = 3
@@ -114,12 +169,18 @@ func _initialize() -> void:
 	_root = Node3D.new()
 	_root.name = "Mundo"
 	root.add_child(_root)
+	_build_grids()
 	_build_ground()
 	_props = _node("Props", _root)
+	_build_water()
 	_build_village()
 	_build_forest()
 	_build_graveyard()
 	_build_ruins()
+	_build_swamp()
+	_build_mountain()
+	_build_coast()
+	_build_desert()
 	_build_meadows()
 	_build_border()
 	_build_zones()
@@ -132,6 +193,8 @@ func _initialize() -> void:
 	_build_camps()
 	_build_shrines()
 	_build_lights()
+	_build_people()
+	_build_events()
 	# Ultimo: necesita todo lo que ocupa lugar.
 	_paint_grass_mask()
 	var grass := Node3D.new()
@@ -172,10 +235,11 @@ func _build_ground() -> void:
 	plane.subdivide_depth = 16
 	var material := ShaderMaterial.new()
 	material.shader = load("res://world/terrain/terrain.gdshader")
-	for layer in ["grass", "dirt", "cobble", "forest", "moss", "rocky"]:
+	for layer in ["grass", "dirt", "cobble", "forest", "moss", "rocky", "sand", "snow"]:
 		material.set_shader_parameter(layer + "_albedo", load("res://assets/terrain/%s_albedo.jpg" % layer))
 		material.set_shader_parameter(layer + "_normal", load("res://assets/terrain/%s_normal.jpg" % layer))
 	material.set_shader_parameter("world_size", SIZE)
+	material.set_shader_parameter("swamp_area", SWAMP)
 	plane.material = material
 	mesh.mesh = plane
 	mesh.layers = 1 | PROP_SCRIPT.MAP_LAYER
@@ -225,14 +289,19 @@ func _build_village() -> void:
 		var pos := Vector3(cos(angle) * 850.0, 0, -200 + sin(angle) * 850.0)
 		_prop(village, G + "lightpost-single.glb", pos, angle, 420.0, 0.25, {"style": PROP_SCRIPT.Style.IRON})
 		_night_light(village, pos + Basis(Vector3.UP, angle) * LAMP_OFFSET * 420.0, {"energy": 1.3})
-	# Muralla con portón hacia las ruinas (norte).
-	_fort_piece(village, "modular_fort_01_wall_thin_gate_01", Vector3(-130, 0, -1900), PI * 0.5, 100.0)
-	_fort_piece(village, "modular_fort_01_wall_thin_straight_04", Vector3(-871, 0, -1900), PI * 0.5, 100.0)
-	_fort_piece(village, "modular_fort_01_wall_thin_straight_03", Vector3(611, 0, -1900), PI * 0.5, 100.0)
-	_fort_piece(village, "modular_fort_01_wall_thick_end_01", Vector3(-1350, 0, -1900), PI * 0.5, 100.0)
-	_fort_piece(village, "modular_fort_01_wall_thick_end_02", Vector3(1350, 0, -1900), -PI * 0.5, 100.0)
-	# Arbustos en el borde de la aldea.
-	_scatter(village, VILLAGE, 1300.0, 1900.0, 18, _shrub)
+	# Casas nuevas en las esquinas, adentro de la muralla.
+	for house in [[V + "qt_house_01/qt_house_01.glb", Vector3(-1850, 0, -2000), 0.8, 330.0], [V + "qt_house_03/qt_house_03.glb", Vector3(1850, 0, -2050), -0.8, 300.0],
+			[V + "qt_house_02/qt_house_02.glb", Vector3(1900, 0, 1750), -2.3, 300.0], [V + "qt_house_01/qt_house_01.glb", Vector3(-1950, 0, 1800), 2.3, 330.0]]:
+		_prop(village, house[0], house[1], house[2], house[3], 0.42, {"style": PROP_SCRIPT.Style.TINT, "tint": VILLAGE_TINT, "fade_when_occluding": true}, true)
+	# Corral con cerco y un carro al sur, y otro puesto al este.
+	for i in 6:
+		var angle: float = TAU * i / 6.0
+		_prop(village, V + "qt_fence/qt_fence.glb", Vector3(-900 + cos(angle) * 380.0, 0, 1650 + sin(angle) * 380.0), angle + PI * 0.5, 260.0, 0.3, {"style": PROP_SCRIPT.Style.TINT, "tint": VILLAGE_TINT})
+	_prop(village, V + "qt_cart/qt_cart.glb", Vector3(950, 0, 1850), 0.6, 380.0, 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": VILLAGE_TINT})
+	_prop(village, V + "qt_market_stand/qt_market_stand.glb", Vector3(1750, 0, -700), -PI * 0.5, 380.0, 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": VILLAGE_TINT})
+	_build_village_wall(village)
+	# Arbustos afuera de la muralla.
+	_scatter(village, Vector3(VILLAGE.x, VILLAGE.y, 0.0), WALL_HALF * 1.5, WALL_HALF * 1.9, 18, _shrub)
 
 
 func _build_forest() -> void:
@@ -316,10 +385,10 @@ func _build_ruins() -> void:
 func _build_meadows() -> void:
 	var meadows := _node("Praderas", _props)
 	var world := Vector3(0, 0, WALK_LIMIT)
-	_scatter(meadows, world, 0.0, WALK_LIMIT, 150, _meadow_tree, true)
-	_scatter(meadows, world, 0.0, WALK_LIMIT, 90, _rock, true)
-	_scatter(meadows, world, 0.0, WALK_LIMIT, 110, _shrub, true)
-	_scatter(meadows, world, 0.0, WALK_LIMIT, 60, _fern, true)
+	_scatter(meadows, world, 0.0, WALK_LIMIT, 420, _meadow_tree, true)
+	_scatter(meadows, world, 0.0, WALK_LIMIT, 240, _rock, true)
+	_scatter(meadows, world, 0.0, WALK_LIMIT, 300, _shrub, true)
+	_scatter(meadows, world, 0.0, WALK_LIMIT, 160, _fern, true)
 
 
 # Bosque cerrado en el borde: tapa el fin del mundo.
@@ -328,10 +397,13 @@ func _build_border() -> void:
 	var t: float = -HALF
 	while t < HALF:
 		for depth in [WALK_LIMIT + 250.0, WALK_LIMIT + 650.0]:
-			for pos in [Vector3(t, 0, -depth), Vector3(t, 0, depth), Vector3(-depth, 0, t), Vector3(depth, 0, t)]:
-				pos += Vector3(_rng.randf_range(-120, 120), 0, _rng.randf_range(-120, 120))
-				var path: String = PINES[_rng.randi() % 2] if _rng.randf() < 0.6 else BROADLEAF[_rng.randi() % 2]
-				_prop(border, path, pos, _rng.randf() * TAU, _rng.randf_range(140.0, 185.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT * 0.85})
+			for pos in [Vector3(t, 0, -depth), Vector3(t, 0, depth), Vector3(-depth, 0, t)]:
+				if pos.x > SHORE_X - 600.0:
+					continue
+				pos += Vector3(_rng2.randf_range(-120, 120), 0, _rng2.randf_range(-120, 120))
+				var path: String = PINES[_rng2.randi() % 2] if _rng2.randf() < 0.6 or pos.z < -12000.0 else BROADLEAF[_rng2.randi() % 2]
+				var tint: Color = SNOW_TINT if pos.z < -12000.0 else FOLIAGE_TINT * 0.85
+				_prop(border, path, pos, _rng2.randf() * TAU, _rng2.randf_range(140.0, 185.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": tint})
 		t += 480.0
 
 
@@ -348,8 +420,15 @@ func _forest_tree(parent: Node3D, pos: Vector3) -> void:
 
 
 func _meadow_tree(parent: Node3D, pos: Vector3) -> void:
-	_prop(parent, BROADLEAF[_rng.randi() % 2] if _rng.randf() < 0.7 else PINES[_rng.randi() % 2], pos, _rng.randf() * TAU,
-			_rng.randf_range(78.0, 100.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT, "fade_when_occluding": true}, false, 40.0)
+	# Al norte (cerca de la nieve) mas pinos y con nieve; cerca de la arena, secos.
+	if pos.z < -11500.0:
+		_prop(parent, PINES[_rng.randi() % 2], pos, _rng.randf() * TAU, _rng.randf_range(78.0, 100.0), 0.0,
+				{"style": PROP_SCRIPT.Style.TINT, "tint": SNOW_TINT, "fade_when_occluding": true}, false, 40.0)
+	elif pos.z > 10500.0 or pos.x > SHORE_X - 1800.0:
+		_dead_tree(parent, pos)
+	else:
+		_prop(parent, BROADLEAF[_rng.randi() % 2] if _rng.randf() < 0.7 else PINES[_rng.randi() % 2], pos, _rng.randf() * TAU,
+				_rng.randf_range(78.0, 100.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT, "fade_when_occluding": true}, false, 40.0)
 
 
 func _dead_tree(parent: Node3D, pos: Vector3) -> void:
@@ -395,6 +474,10 @@ func _build_zones() -> void:
 	_zone(zones, "Pradera", Vector3(3600, 0, 3400), Vector3(4400, 1, 4400), 1, [skeleton, wolf], [2.0, 1.0], 6)
 	_zone(zones, "Cementerio", Vector3(GRAVEYARD.x, 0, GRAVEYARD.y), Vector3(4200, 1, 4200), 4, [zombie, skeleton, warrior], [4.0, 3.0, 1.5], 10)
 	_zone(zones, "Ruinas", Vector3(RUINS.x, 0, RUINS.y), Vector3(4000, 1, 3600), 6, [bandit, archer, warrior, skeleton], [4.0, 3.0, 2.0, 1.0], 10)
+	_zone(zones, "Pantano", Vector3(SWAMP.x, 0, SWAMP.y), Vector3(SWAMP.z * 2.0, 1, SWAMP.z * 2.0), 5, [zombie, spider, skeleton], [4.0, 3.0, 1.0], 10)
+	_zone(zones, "Costa", Vector3(COAST.x, 0, COAST.y), Vector3(COAST.z * 2.0, 1, COAST.z * 2.0), 7, [bandit, archer, skeleton], [4.0, 3.0, 2.0], 10)
+	_zone(zones, "Desierto", Vector3(DESERT.x, 0, DESERT.y), Vector3(DESERT.z * 2.0, 1, DESERT.z * 2.0), 8, [spider, warrior, archer], [4.0, 3.0, 2.0], 10)
+	_zone(zones, "Montaña", Vector3(MOUNTAIN.x, 0, MOUNTAIN.y), Vector3(MOUNTAIN.z * 2.0, 1, MOUNTAIN.z * 2.0), 9, [wolf, warrior, skeleton], [4.0, 3.0, 2.0], 10)
 
 
 func _zone(parent: Node3D, zone_name: String, pos: Vector3, size: Vector3, level: int, types: Array, weights: Array, max_enemies: int) -> void:
@@ -421,6 +504,10 @@ func _build_portals() -> void:
 	_portal(portals, "bosque", "Bosque Umbrío", Vector3(-4400, 0, -1550))
 	_portal(portals, "cementerio", "Camposanto Hundido", Vector3(3900, 0, -3100))
 	_portal(portals, "ruinas", "Ruinas de Kael", Vector3(-700, 0, -6300))
+	_portal(portals, "pantano", "Ciénaga de los Ahogados", Vector3(-12300, 0, 900))
+	_portal(portals, "montana", "Cumbres Heladas", Vector3(-1500, 0, -12300))
+	_portal(portals, "costa", "Costa de los Naufragios", Vector3(12900, 0, -1700))
+	_portal(portals, "desierto", "Mar de Arena", Vector3(2300, 0, 12000))
 
 
 func _portal(parent: Node3D, id: String, display_name: String, pos: Vector3) -> void:
@@ -442,6 +529,12 @@ func _build_chests() -> void:
 	_scatter(chests, Vector3(3200, 3600, 2000), 0.0, 2000.0, 2, _chest.bind(1, 0), false, 90.0, 600)
 	_scatter(chests, Vector3(GRAVEYARD.x, GRAVEYARD.y, 1300.0), 300.0, 1250.0, 3, _chest.bind(4, 1), false, 90.0, 600)
 	_scatter(chests, RUINS, 300.0, RUINS.z * 0.9, 4, _chest.bind(6, 1), false, 90.0, 600)
+	_scatter(chests, SWAMP, 400.0, SWAMP.z * 0.85, 4, _chest.bind(5, 1), false, 90.0, 600)
+	_scatter(chests, MOUNTAIN, 400.0, MOUNTAIN.z * 0.85, 4, _chest.bind(9, 1), false, 90.0, 600)
+	_scatter(chests, COAST, 400.0, COAST.z * 0.85, 4, _chest.bind(7, 1), false, 90.0, 600)
+	_scatter(chests, DESERT, 400.0, DESERT.z * 0.85, 4, _chest.bind(8, 1), false, 90.0, 600)
+	_scatter(chests, Vector3(-12800, -7400, 1500), 0.0, 1500.0, 2, _chest.bind(6, 0), false, 90.0, 600)
+	_scatter(chests, Vector3(12600, -6600, 1500), 0.0, 1500.0, 2, _chest.bind(8, 0), false, 90.0, 600)
 
 
 # Herreria de la aldea (el modelo esta abierto hacia +Z) con el herrero adelante.
@@ -466,6 +559,10 @@ func _build_camps() -> void:
 	_scatter(camps, FOREST, 500.0, FOREST.z * 0.85, 2, _camp.bind(3), false, 70.0, 900)
 	_scatter(camps, Vector3(2600, 2400, 1800), 0.0, 1800.0, 2, _camp.bind(1), false, 150.0, 300)
 	_scatter(camps, Vector3(GRAVEYARD.x, GRAVEYARD.y, 1300.0), 400.0, 1250.0, 1, _camp.bind(4), false, 40.0, 900)
+	_scatter(camps, SWAMP, 500.0, SWAMP.z * 0.8, 2, _camp.bind(5), false, 70.0, 900)
+	_scatter(camps, MOUNTAIN, 500.0, MOUNTAIN.z * 0.8, 2, _camp.bind(9), false, 70.0, 900)
+	_scatter(camps, COAST, 500.0, COAST.z * 0.8, 3, _camp.bind(7), false, 70.0, 900)
+	_scatter(camps, DESERT, 500.0, DESERT.z * 0.8, 2, _camp.bind(8), false, 70.0, 900)
 
 
 func _camp(parent: Node3D, pos: Vector3, level: int) -> void:
@@ -492,7 +589,9 @@ func _breakable(prop: Node3D, level: int, display_name: String) -> void:
 func _build_shrines() -> void:
 	var shrines := _node("Santuarios", _root)
 	for spot in [[Vector3(-5300, -3400, 1200), 3], [Vector3(2700, 1900, 800), 2], [Vector3(GRAVEYARD.x - 1900, GRAVEYARD.y + 1400, 600), 1],
-			[Vector3(RUINS.x + 1300, RUINS.y + 1400, 900), 0], [Vector3(-2600, 900, 700), 4]]:
+			[Vector3(RUINS.x + 1300, RUINS.y + 1400, 900), 0], [Vector3(-3400, 900, 700), 4],
+			[Vector3(SWAMP.x + 600, SWAMP.y - 1500, 900), 3], [Vector3(MOUNTAIN.x + 1400, MOUNTAIN.y + 900, 900), 4],
+			[Vector3(COAST.x - 400, COAST.y - 1900, 900), 2], [Vector3(DESERT.x - 1500, DESERT.y - 600, 900), 0]]:
 		_scatter(shrines, spot[0], 0.0, spot[0].z, 1, _shrine.bind(spot[1]), false, 90.0, 1500)
 
 
@@ -537,6 +636,17 @@ func _build_lights() -> void:
 		var free: Vector2 = _find_free(spot, 60.0)
 		if free.is_finite():
 			_torch(ruins, Vector3(free.x, 0, free.y))
+	# Antorchas en los portones de la muralla (afuera) y en los puentes.
+	for gate in _gates:
+		for side in [-1.0, 1.0]:
+			var spot: Vector2 = gate.center + gate.normal * 260.0 + gate.along * side * 520.0
+			var free: Vector2 = _find_free(spot, 50.0)
+			if free.is_finite():
+				_torch(village, Vector3(free.x, 0, free.y))
+	for bridge in _bridges:
+		var free: Vector2 = _find_free(bridge.center + bridge.dir * (bridge.length / 2.0 + 180.0) + bridge.dir.orthogonal() * 300.0, 50.0)
+		if free.is_finite():
+			_torch(_props, Vector3(free.x, 0, free.y))
 
 
 ## Lugar libre lo mas cerca posible de point y fuera de los caminos (busca en
@@ -617,7 +727,9 @@ func _build_labels() -> void:
 	var labels := _node("NombresDelMapa", _root)
 	for entry in [["Aldea del Vado", Vector2(VILLAGE.x, VILLAGE.y)], ["Bosque Umbrío", Vector2(FOREST.x, FOREST.y)],
 			["Camposanto Hundido", Vector2(GRAVEYARD.x, GRAVEYARD.y)], ["Ruinas de Kael", Vector2(RUINS.x, RUINS.y)],
-			["Prados del Sur", Vector2(1500, 4500)]]:
+			["Prados del Sur", Vector2(1500, 4500)], ["Ciénaga de los Ahogados", Vector2(SWAMP.x, SWAMP.y)],
+			["Cumbres Heladas", Vector2(MOUNTAIN.x, MOUNTAIN.y)], ["Costa de los Naufragios", Vector2(COAST.x, COAST.y)],
+			["Mar de Arena", Vector2(DESERT.x, DESERT.y)], ["Río Frío", Vector2(9300, -9800)], ["Río Turbio", Vector2(-9800, -9000)]]:
 		var marker := Marker3D.new()
 		marker.name = entry[0].replace(" ", "")
 		marker.position = Vector3(entry[1].x, 0, entry[1].y)
@@ -661,7 +773,9 @@ func _scatter(parent: Node3D, zone: Vector3, inner: float, outer: float, count: 
 			continue
 		if _distance_to_paths(point) < PATH_WIDTH + 140.0:
 			continue
-		if zone != VILLAGE and point.distance_to(Vector2(VILLAGE.x, VILLAGE.y)) < 900.0:
+		if zone != VILLAGE and _inside_walls(point, 250.0):
+			continue
+		if _distance_to_rivers(point) < 520.0 or point.x > _shore_x(point.y) - 350.0:
 			continue
 		if not _is_free(point, clearance):
 			continue
@@ -670,10 +784,20 @@ func _scatter(parent: Node3D, zone: Vector3, inner: float, outer: float, count: 
 
 
 func _in_any_zone(point: Vector2) -> bool:
-	for zone in [VILLAGE, FOREST, GRAVEYARD, RUINS]:
+	for zone in [VILLAGE, FOREST, GRAVEYARD, RUINS, SWAMP, MOUNTAIN, COAST, DESERT]:
 		if point.distance_to(Vector2(zone.x, zone.y)) < zone.z + 300.0:
 			return true
 	return false
+
+
+## Adentro de la muralla de la aldea (con margen).
+func _inside_walls(point: Vector2, margin: float = 0.0) -> bool:
+	return absf(point.x - VILLAGE.x) < WALL_HALF + margin and absf(point.y - VILLAGE.y) < WALL_HALF + margin
+
+
+## x de la orilla del mar a la altura z.
+func _shore_x(z: float) -> float:
+	return SHORE_X + _noise.get_noise_2d(SHORE_X, z * 0.6) * 900.0
 
 
 func _is_free(point: Vector2, radius: float) -> bool:
@@ -796,13 +920,25 @@ func _paint_splats() -> void:
 			var forest: float = _area(p, Vector2(FOREST.x, FOREST.y), FOREST.z * 1.05, wobble * 3.0)
 			var moss: float = _area(p, Vector2(GRAVEYARD.x, GRAVEYARD.y), GRAVEYARD.z, wobble * 2.0)
 			var rocky: float = _area(p, Vector2(RUINS.x, RUINS.y), RUINS.z * 1.1, wobble * 2.0)
+			# Pantano: barro del bosque y musgo (el shader lo oscurece).
+			var swamp: float = _area(p, Vector2(SWAMP.x, SWAMP.y), SWAMP.z * 1.1, wobble * 3.0)
+			forest = maxf(forest, swamp * 0.85)
+			moss = maxf(moss, swamp * 0.55)
+			# Arena en el desierto y la playa; nieve en la montaña y el norte.
+			var sand: float = maxf(_area(p, Vector2(DESERT.x, DESERT.y), DESERT.z * 1.25, wobble * 3.0), smoothstep(-2000.0, -1000.0, p.x - _shore_x(p.y) + wobble * 260.0))
+			sand = maxf(sand, smoothstep(12500.0, 15500.0, p.y + wobble * 500.0) * 0.8)
+			var snow: float = maxf(_area(p, Vector2(MOUNTAIN.x, MOUNTAIN.y), MOUNTAIN.z * 1.25, wobble * 3.0), 1.0 - smoothstep(-15500.0, -12800.0, p.y + wobble * 500.0))
+			rocky = maxf(rocky, _area(p, Vector2(MOUNTAIN.x, MOUNTAIN.y), MOUNTAIN.z * 1.3, wobble * 3.0) * smoothstep(0.55, 0.75, detail.get_noise_2dv(p * 0.5) * 0.5 + 0.5))
+			# Orillas de los rios: tierra mojada.
+			var bank: float = 1.0 - smoothstep(0.0, 260.0, _distance_to_rivers(p) + wobble * 60.0)
 			# Manchas de piedra sueltas por el mundo.
 			rocky = maxf(rocky, smoothstep(0.62, 0.72, detail.get_noise_2dv(p * 0.35 + Vector2(900, 400)) * 0.5 + 0.5))
 			var plaza_weight: float = clampf(plaza, 0.0, 1.0)
 			# El camino se pierde al entrar a la plaza.
 			dirt *= 1.0 - plaza_weight * 0.8
+			dirt = maxf(dirt, bank * 0.9)
 			a.set_pixel(x, y, Color(dirt, plaza_weight, forest, moss))
-			b.set_pixel(x, y, Color(rocky * (1.0 - plaza_weight), tone.get_noise_2dv(p) * 0.5 + 0.5, 0.0, 1.0))
+			b.set_pixel(x, y, Color(rocky * (1.0 - plaza_weight), tone.get_noise_2dv(p) * 0.5 + 0.5, sand * (1.0 - snow), snow))
 	# El piso los carga al abrir (world/terrain/ground.gd).
 	a.save_png(ProjectSettings.globalize_path(SPLAT_A))
 	b.save_png(ProjectSettings.globalize_path(SPLAT_B))
@@ -832,11 +968,16 @@ func _paint_grass_mask() -> void:
 				kind = 0.5
 			var density: float = clampf(1.0 - maxf(maxf(a.r * 1.6, a.g * 2.0), b.r * 1.4), 0.0, 1.0)
 			density *= (1.0 - a.b * 0.75) * (1.0 - a.a * 0.35)
+			density *= clampf(1.0 - maxf(b.b, b.a) * 1.6, 0.0, 1.0)
+			if p.x > _shore_x(p.y) - 200.0 or _distance_to_rivers(p) < 80.0:
+				density = 0.0
+			if b.b > 0.5 or b.a > 0.5:
+				kind = 0.5
 			# Manchas mas y menos tupidas.
 			density *= clampf(0.55 + patches.get_noise_2dv(p) * 0.9, 0.15, 1.0)
 			if absf(p.x) > WALK_LIMIT + 300.0 or absf(p.y) > WALK_LIMIT + 300.0:
 				density = 0.0
-			var dry: float = clampf(a.a * 0.9 + _area(p, Vector2(RUINS.x, RUINS.y), RUINS.z * 1.2, 0.0) * 0.7, 0.0, 1.0)
+			var dry: float = clampf(a.a * 0.9 + _area(p, Vector2(RUINS.x, RUINS.y), RUINS.z * 1.2, 0.0) * 0.7 + b.b * 0.8, 0.0, 1.0)
 			mask.set_pixel(x, y, Color(density, dry, kind, 1.0))
 	for other in _occupied:
 		var radius: float = other.z * 0.7 / px
@@ -855,13 +996,54 @@ func _area(p: Vector2, center: Vector2, radius: float, wobble: float) -> float:
 	return 1.0 - smoothstep(radius * 0.8, radius, d)
 
 
+## Distancia al camino mas cercano (INF si no hay ninguno a menos de GRID_CELL).
 func _distance_to_paths(p: Vector2) -> float:
+	return _grid_distance(_path_grid, p)
+
+
+## Distancia a la orilla del rio mas cercano (negativa adentro del agua; INF lejos).
+func _distance_to_rivers(p: Vector2) -> float:
+	return _grid_distance(_river_grid, p)
+
+
+const GRID_CELL: float = 1200.0
+
+
+func _grid_distance(grid: Dictionary, p: Vector2) -> float:
+	var cell := Vector2i(floori(p.x / GRID_CELL), floori(p.y / GRID_CELL))
 	var best: float = INF
+	for segment in grid.get(cell, []):
+		var closest: Vector2 = Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])
+		best = minf(best, p.distance_to(closest) - segment[2])
+	return best
+
+
+# Cada tramo (a, b, medio ancho) va a todas las celdas que toca con un margen
+# de una celda: asi una consulta mira solo su celda.
+func _grid_add(grid: Dictionary, a: Vector2, b: Vector2, half_width: float) -> void:
+	var low := Vector2i(floori((minf(a.x, b.x) - GRID_CELL) / GRID_CELL), floori((minf(a.y, b.y) - GRID_CELL) / GRID_CELL))
+	var high := Vector2i(floori((maxf(a.x, b.x) + GRID_CELL) / GRID_CELL), floori((maxf(a.y, b.y) + GRID_CELL) / GRID_CELL))
+	for y in range(low.y, high.y + 1):
+		for x in range(low.x, high.x + 1):
+			var cell := Vector2i(x, y)
+			if not grid.has(cell):
+				grid[cell] = []
+			grid[cell].append([a, b, half_width])
+
+
+func _build_grids() -> void:
 	for path in _paths:
 		for i in path.size() - 1:
-			var closest: Vector2 = Geometry2D.get_closest_point_to_segment(p, path[i], path[i + 1])
-			best = minf(best, p.distance_to(closest))
-	return best
+			_grid_add(_path_grid, path[i], path[i + 1], 0.0)
+	for river in RIVERS:
+		var points: PackedVector2Array = _smooth(PackedVector2Array(river.points), 3)
+		points = _resample(points, 260.0)
+		var widths := PackedFloat32Array()
+		for i in points.size():
+			widths.append(river.width * (0.85 + 0.3 * (_noise.get_noise_2dv(points[i] * 2.0) * 0.5 + 0.5)))
+		_river_lines.append({"name": river.name, "points": points, "widths": widths})
+		for i in points.size() - 1:
+			_grid_add(_river_grid, points[i], points[i + 1], (widths[i] + widths[i + 1]) * 0.25)
 
 
 # --- Navegacion -------------------------------------------------------------
@@ -888,6 +1070,9 @@ func _bake_navigation() -> void:
 	var start: int = Time.get_ticks_msec()
 	NavigationServer3D.bake_from_source_geometry_data(nav_mesh, source)
 	var removed: int = _keep_connected(nav_mesh, Vector3(VILLAGE.x, 0, VILLAGE.y))
+	for region in {"pantano": SWAMP, "montaña": MOUNTAIN, "costa": COAST, "desierto": DESERT}:
+		var c: Vector3 = {"pantano": SWAMP, "montaña": MOUNTAIN, "costa": COAST, "desierto": DESERT}[region]
+		print("  %s conectado: %s" % [region, _has_polygon_near(nav_mesh, Vector2(c.x, c.y), 1500.0)])
 	print("navegacion: %d poligonos en %d ms (%d sueltos sacados)" % [nav_mesh.get_polygon_count(), Time.get_ticks_msec() - start, removed])
 	ResourceSaver.save(nav_mesh, OUT_NAV)
 	var region := NavigationRegion3D.new()
@@ -902,6 +1087,15 @@ func _bake_navigation() -> void:
 ## (techos de portales, cajas, rincones cerrados) a las que no se puede
 ## llegar. Si no, un clic cerca de una mandaba al jugador a cualquier lado y
 ## los enemigos podian aparecer arriba de un portal. Devuelve cuantos saco.
+func _has_polygon_near(nav_mesh: NavigationMesh, point: Vector2, radius: float) -> bool:
+	var vertices: PackedVector3Array = nav_mesh.get_vertices()
+	for i in nav_mesh.get_polygon_count():
+		var index: int = nav_mesh.get_polygon(i)[0]
+		if Vector2(vertices[index].x, vertices[index].z).distance_to(point) < radius:
+			return true
+	return false
+
+
 func _keep_connected(nav_mesh: NavigationMesh, seed_point: Vector3) -> int:
 	var vertices: PackedVector3Array = nav_mesh.get_vertices()
 	var polygons: Array[PackedInt32Array] = []
@@ -966,3 +1160,572 @@ func _set_owner(node: Node, owner_node: Node) -> void:
 		# Lo de adentro de los modelos importados no se guarda: viene del archivo.
 		if child.scene_file_path.is_empty():
 			_set_owner(child, owner_node)
+
+
+# --- Muralla de la aldea ------------------------------------------------------
+
+## Cuadrado de muros con torres redondas en las esquinas y un porton donde
+## cada camino cruza la muralla (los guardias se paran ahi).
+func _build_village_wall(village: Node3D) -> void:
+	var wall := _node("Muralla", village)
+	var center := Vector2(VILLAGE.x, VILLAGE.y)
+	var corners: Array[Vector2] = [center + Vector2(-WALL_HALF, -WALL_HALF), center + Vector2(WALL_HALF, -WALL_HALF),
+			center + Vector2(WALL_HALF, WALL_HALF), center + Vector2(-WALL_HALF, WALL_HALF)]
+	for corner in corners:
+		_wall_piece(wall, "modular_fort_01_tower_round", corner, Vector2.DOWN, 75.0)
+	var tower_radius: float = 15.84 * 75.0 * 0.45
+	for side in 4:
+		var start: Vector2 = corners[side]
+		var finish: Vector2 = corners[(side + 1) % 4]
+		var along: Vector2 = (finish - start).normalized()
+		var outward: Vector2 = ((start + finish) / 2.0 - center).normalized()
+		var length: float = start.distance_to(finish)
+		# Donde lo cruzan los caminos (distancia desde start).
+		var gate_spots: Array[float] = []
+		for path in _paths:
+			for i in path.size() - 1:
+				var hit: Variant = Geometry2D.segment_intersects_segment(start, finish, path[i], path[i + 1])
+				if hit != null:
+					gate_spots.append(start.distance_to(hit))
+		gate_spots.sort()
+		var free_from: float = tower_radius
+		for spot in gate_spots:
+			_wall_run(wall, start, along, free_from, spot - GATE_LENGTH / 2.0, true)
+			var gate_center: Vector2 = start + along * spot
+			_wall_piece(wall, "modular_fort_01_wall_thin_gate_01", gate_center, along, 100.0)
+			_gates.append({"center": gate_center, "along": along, "normal": outward})
+			free_from = spot + GATE_LENGTH / 2.0
+		_wall_run(wall, start, along, free_from, length - tower_radius, false)
+
+
+const GATE_LENGTH: float = 741.0
+const WALL_LENGTH: float = 1482.0
+
+
+# Muro recto entre dos distancias del lado: piezas de 1482 que se pisan un
+# poco para que la ultima termine justo donde tiene que terminar.
+func _wall_run(parent: Node3D, start: Vector2, along: Vector2, from: float, to: float, gate_at_end: bool) -> void:
+	var length: float = to - from
+	if length < 60.0:
+		return
+	if length <= GATE_LENGTH:
+		# Una pieza corta pegada al porton (lo que sobra se mete en la torre).
+		var middle: float = to - GATE_LENGTH / 2.0 if gate_at_end else from + GATE_LENGTH / 2.0
+		_wall_piece(parent, "modular_fort_01_wall_thin_straight_04", start + along * middle, along, 100.0)
+		return
+	var count: int = ceili(length / WALL_LENGTH)
+	var step: float = (length - WALL_LENGTH) / maxf(count - 1, 1)
+	for i in count:
+		var middle: float = from + WALL_LENGTH / 2.0 + step * i if count > 1 else from + length / 2.0
+		_wall_piece(parent, "modular_fort_01_wall_thin_straight_01", start + along * middle, along, 100.0)
+
+
+## Pieza del fuerte con el centro de su caja en center y su largo (eje z del
+## modelo) a lo largo de along.
+func _wall_piece(parent: Node3D, piece: String, center: Vector2, along: Vector2, scale: float) -> void:
+	if not _fort_bounds.has(piece):
+		var model: Node3D = _scene(FORT).instantiate()
+		_fort_bounds[piece] = _model_bounds(model, piece)
+		model.free()
+	var bounds: AABB = _fort_bounds[piece]
+	var angle: float = atan2(along.x, along.y)
+	var offset: Vector3 = Basis(Vector3.UP, angle) * Vector3(bounds.get_center().x, 0.0, bounds.get_center().z) * scale
+	_fort_piece(parent, piece, Vector3(center.x, 0, center.y) - offset, angle, scale)
+
+
+# --- Agua: rios, mar, charcos y puentes ---------------------------------------
+
+func _build_water() -> void:
+	var water := _node("Agua", _root)
+	var river_material := ShaderMaterial.new()
+	river_material.shader = load(WATER_SHADER)
+	var segments := PackedVector2Array()
+	for line in _river_lines:
+		_river(water, line, river_material)
+		var points: PackedVector2Array = line.points
+		for i in points.size() - 1:
+			segments.append(points[i])
+			segments.append(points[i + 1])
+	var shore := _build_sea(water)
+	_build_pools(water)
+	var sounds := Node3D.new()
+	sounds.name = "SonidoDelAgua"
+	sounds.set_script(load(WATER_SOUNDS_SCRIPT))
+	sounds.river_segments = segments
+	sounds.shore = shore
+	water.add_child(sounds)
+
+
+func _river(parent: Node3D, line: Dictionary, material: ShaderMaterial) -> void:
+	var points: PackedVector2Array = line.points
+	var widths: PackedFloat32Array = line.widths
+	var river := _node(line.name, parent)
+	# Puentes donde la cruzan los caminos.
+	var crossings: Array = []
+	for i in points.size() - 1:
+		for path in _paths:
+			for k in path.size() - 1:
+				var hit: Variant = Geometry2D.segment_intersects_segment(points[i], points[i + 1], path[k], path[k + 1])
+				if hit != null:
+					var dir: Vector2 = (path[k + 1] - path[k]).normalized()
+					var length: float = widths[i] / absf(dir.dot((points[i + 1] - points[i]).normalized().orthogonal())) + 520.0
+					crossings.append({"center": hit, "dir": dir, "length": minf(length, widths[i] * 2.5)})
+	for crossing in crossings:
+		_bridges.append(crossing)
+		_bridge(river, crossing.center, crossing.dir, crossing.length)
+		_occupied.append(Vector3(crossing.center.x, crossing.center.y, crossing.length * 0.6))
+
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var travelled: float = 0.0
+	var left := PackedVector3Array()
+	var right := PackedVector3Array()
+	var v := PackedFloat32Array()
+	for i in points.size():
+		var before: Vector2 = points[maxi(i - 1, 0)]
+		var after: Vector2 = points[mini(i + 1, points.size() - 1)]
+		var side: Vector2 = (after - before).normalized().orthogonal()
+		if i > 0:
+			travelled += points[i].distance_to(points[i - 1])
+		left.append(Vector3(points[i].x + side.x * widths[i] / 2.0, WATER_Y, points[i].y + side.y * widths[i] / 2.0))
+		right.append(Vector3(points[i].x - side.x * widths[i] / 2.0, WATER_Y, points[i].y - side.y * widths[i] / 2.0))
+		v.append(travelled / 700.0)
+	for i in points.size() - 1:
+		_quad(tool, left[i], right[i], left[i + 1], right[i + 1], Vector2(0, v[i]), Vector2(1, v[i]), Vector2(0, v[i + 1]), Vector2(1, v[i + 1]))
+	_water_mesh(river, tool, material)
+
+	# Colision del cauce: cajas por tramo, menos donde estan los puentes.
+	var body := StaticBody3D.new()
+	body.name = "Cauce"
+	river.add_child(body)
+	for i in points.size() - 1:
+		var width: float = (widths[i] + widths[i + 1]) / 2.0 * 0.82
+		var middle: Vector2 = (points[i] + points[i + 1]) / 2.0
+		var near_bridge: bool = crossings.any(func(crossing: Dictionary) -> bool: return middle.distance_to(crossing.center) < 900.0)
+		var pieces: int = ceili(points[i].distance_to(points[i + 1]) / 40.0) if near_bridge else 1
+		for k in pieces:
+			var a: Vector2 = points[i].lerp(points[i + 1], float(k) / pieces)
+			var b: Vector2 = points[i].lerp(points[i + 1], float(k + 1) / pieces)
+			var center: Vector2 = (a + b) / 2.0
+			if near_bridge and crossings.any(func(crossing: Dictionary) -> bool: return _on_deck(center, crossing)):
+				continue
+			var segment: Vector2 = b - a
+			var shape := CollisionShape3D.new()
+			var box := BoxShape3D.new()
+			box.size = Vector3(width, 400.0, segment.length() + (10.0 if near_bridge else 40.0))
+			shape.shape = box
+			shape.transform = Transform3D(Basis(Vector3.UP, atan2(segment.x, segment.y)), Vector3(center.x, 200.0, center.y))
+			body.add_child(shape)
+
+
+# Sobre el pasillo de un puente (entre las barandas y a lo largo del tablero).
+func _on_deck(point: Vector2, crossing: Dictionary) -> bool:
+	var offset: Vector2 = point - crossing.center
+	return absf(offset.dot(crossing.dir.orthogonal())) < BRIDGE_WIDTH / 2.0 + 25.0 and absf(offset.dot(crossing.dir)) < crossing.length / 2.0
+
+
+const WATER_Y: float = 4.0
+
+
+func _quad(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, ua: Vector2, ub: Vector2, uc: Vector2, ud: Vector2) -> void:
+	for vertex in [[a, ua], [b, ub], [c, uc], [b, ub], [d, ud], [c, uc]]:
+		tool.set_normal(Vector3.UP)
+		tool.set_uv(vertex[1])
+		tool.add_vertex(vertex[0])
+
+
+func _water_mesh(parent: Node3D, tool: SurfaceTool, material: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Agua"
+	mesh.mesh = tool.commit()
+	mesh.material_override = material
+	mesh.layers = 1 | PROP_SCRIPT.MAP_LAYER
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mesh)
+	return mesh
+
+
+## El mar del este: una franja ancha desde la orilla hasta mas alla del
+## borde, con colision a lo largo de la orilla. Devuelve los puntos de la
+## orilla (para el sonido de las olas).
+func _build_sea(parent: Node3D) -> PackedVector2Array:
+	var sea := _node("Mar", parent)
+	var material := ShaderMaterial.new()
+	material.shader = load(WATER_SHADER)
+	material.set_shader_parameter("deep_color", Color(0.05, 0.18, 0.27))
+	material.set_shader_parameter("shallow_color", Color(0.14, 0.36, 0.42))
+	material.set_shader_parameter("foam_both_sides", false)
+	material.set_shader_parameter("foam_width", 0.025)
+	material.set_shader_parameter("wave_strength", 1.6)
+	material.set_shader_parameter("flow_speed", 0.12)
+	var shore := PackedVector2Array()
+	var z: float = -HALF - 2000.0
+	while z <= HALF + 2000.0:
+		shore.append(Vector2(_shore_x(z), z))
+		z += 400.0
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var far: float = HALF + 6000.0
+	for i in shore.size() - 1:
+		var a := Vector3(shore[i].x, WATER_Y, shore[i].y)
+		var c := Vector3(shore[i + 1].x, WATER_Y, shore[i + 1].y)
+		_quad(tool, a, Vector3(far, WATER_Y, shore[i].y), c, Vector3(far, WATER_Y, shore[i + 1].y),
+				Vector2(0, shore[i].y / 700.0), Vector2(1, shore[i].y / 700.0), Vector2(0, shore[i + 1].y / 700.0), Vector2(1, shore[i + 1].y / 700.0))
+	_water_mesh(sea, tool, material)
+	var body := StaticBody3D.new()
+	body.name = "Orilla"
+	sea.add_child(body)
+	for i in shore.size() - 1:
+		var segment: Vector2 = shore[i + 1] - shore[i]
+		var middle: Vector2 = (shore[i] + shore[i + 1]) / 2.0
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(900.0, 400.0, segment.length() + 40.0)
+		shape.shape = box
+		shape.transform = Transform3D(Basis(Vector3.UP, atan2(segment.x, segment.y)), Vector3(middle.x + 500.0, 200.0, middle.y))
+		body.add_child(shape)
+	return shore
+
+
+## Charcos del pantano: manchas de agua con colision (no se pueden pisar).
+func _build_pools(parent: Node3D) -> void:
+	var pools := _node("Charcos", parent)
+	var material := ShaderMaterial.new()
+	material.shader = load(WATER_SHADER)
+	material.set_shader_parameter("deep_color", Color(0.08, 0.12, 0.07))
+	material.set_shader_parameter("shallow_color", Color(0.2, 0.25, 0.13))
+	material.set_shader_parameter("foam_color", Color(0.45, 0.5, 0.32))
+	material.set_shader_parameter("flow_speed", 0.04)
+	material.set_shader_parameter("wave_strength", 0.4)
+	var body := StaticBody3D.new()
+	body.name = "Colision"
+	pools.add_child(body)
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var placed: int = 0
+	var tries: int = 0
+	while placed < 16 and tries < 600:
+		tries += 1
+		var angle: float = _rng.randf() * TAU
+		var dist: float = sqrt(_rng.randf()) * SWAMP.z * 0.85
+		var center := Vector2(SWAMP.x, SWAMP.y) + Vector2(cos(angle), sin(angle)) * dist
+		var radius: float = _rng.randf_range(260.0, 620.0)
+		if _distance_to_paths(center) < PATH_WIDTH + radius + 120.0 or _distance_to_rivers(center) < radius + 200.0 or not _is_free(center, radius + 150.0):
+			continue
+		_pools.append(Vector3(center.x, center.y, radius))
+		_occupied.append(Vector3(center.x, center.y, radius + 60.0))
+		var ring: int = 22
+		var rim := PackedVector3Array()
+		for k in ring:
+			var a: float = TAU * k / ring
+			var r: float = radius * (1.0 + 0.22 * _noise.get_noise_2d(center.x + cos(a) * 300.0, center.y + sin(a) * 300.0) * 2.0)
+			rim.append(Vector3(center.x + cos(a) * r, WATER_Y, center.y + sin(a) * r))
+		var middle := Vector3(center.x, WATER_Y, center.y)
+		for k in ring:
+			_quad(tool, rim[k], middle, rim[(k + 1) % ring], middle, Vector2(0, k), Vector2(0.5, k), Vector2(0, k + 1), Vector2(0.5, k + 1))
+		var shape := CollisionShape3D.new()
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = radius * 0.78
+		cylinder.height = 400.0
+		shape.shape = cylinder
+		shape.position = Vector3(center.x, 200.0, center.y)
+		body.add_child(shape)
+		placed += 1
+	_water_mesh(pools, tool, material)
+
+
+## Puente de tablones sobre el rio, a lo largo del camino (dir). El piso de
+## abajo es el mismo (el mundo es plano): el cauce no tiene colision en el
+## ancho del puente y las barandas no dejan bajar al agua.
+func _bridge(parent: Node3D, center: Vector2, dir: Vector2, length: float) -> void:
+	var bridge := Node3D.new()
+	bridge.name = "Puente"
+	bridge.transform = Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.y)), Vector3(center.x, 0, center.y))
+	parent.add_child(bridge, true)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_texture = load(P + "wooden_crate_01/textures/wooden_crate_01_diff_1k.jpg")
+	wood.albedo_color = Color(0.9, 0.82, 0.74)
+	wood.roughness = 0.9
+	wood.uv1_scale = Vector3(0.6, 0.6, 0.6)
+	var plank := BoxMesh.new()
+	plank.size = Vector3(BRIDGE_WIDTH, 10.0, 54.0)
+	plank.material = wood
+	var planks := MultiMesh.new()
+	planks.transform_format = MultiMesh.TRANSFORM_3D
+	planks.mesh = plank
+	var count: int = int(length / 62.0)
+	planks.instance_count = count
+	for i in count:
+		var z: float = -length / 2.0 + 31.0 + i * 62.0
+		var t: float = z / (length / 2.0)
+		var rot := Basis(Vector3.UP, _rng.randf_range(-0.03, 0.03))
+		planks.set_instance_transform(i, Transform3D(rot, Vector3(_rng.randf_range(-8.0, 8.0), 6.0 + 8.0 * (1.0 - t * t), z)))
+	var deck := MultiMeshInstance3D.new()
+	deck.name = "Tablones"
+	deck.multimesh = planks
+	deck.layers = 1 | PROP_SCRIPT.MAP_LAYER
+	bridge.add_child(deck)
+	# Postes y barandas a los dos costados.
+	var post := CylinderMesh.new()
+	post.top_radius = 14.0
+	post.bottom_radius = 16.0
+	post.height = 160.0
+	post.radial_segments = 6
+	post.material = wood
+	var rail := BoxMesh.new()
+	rail.size = Vector3(14.0, 14.0, length)
+	rail.material = wood
+	var body := StaticBody3D.new()
+	body.name = "Barandas"
+	bridge.add_child(body)
+	for side in [-1.0, 1.0]:
+		var x: float = side * (BRIDGE_WIDTH / 2.0 + 10.0)
+		var posts: int = maxi(2, int(length / 280.0) + 1)
+		for i in posts:
+			var z: float = lerpf(-length / 2.0 + 20.0, length / 2.0 - 20.0, float(i) / (posts - 1))
+			var mesh := MeshInstance3D.new()
+			mesh.mesh = post
+			mesh.position = Vector3(x, 80.0, z)
+			mesh.layers = 1 | PROP_SCRIPT.MAP_LAYER
+			bridge.add_child(mesh)
+		for height in [70.0, 140.0]:
+			var mesh := MeshInstance3D.new()
+			mesh.mesh = rail
+			mesh.position = Vector3(x, height, 0.0)
+			bridge.add_child(mesh)
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(40.0, 300.0, length + 120.0)
+		shape.shape = box
+		shape.position = Vector3(x + side * 20.0, 150.0, 0.0)
+		body.add_child(shape)
+
+
+# --- Regiones de afuera ---------------------------------------------------------
+
+func _build_swamp() -> void:
+	var swamp := _node("Pantano", _props)
+	_scatter(swamp, SWAMP, 0.0, SWAMP.z, 110, _swamp_tree)
+	_scatter(swamp, SWAMP, 0.0, SWAMP.z, 90, _swamp_plant)
+	_scatter(swamp, SWAMP, 0.0, SWAMP.z, 25, _stump)
+	_scatter(swamp, SWAMP, 0.0, SWAMP.z, 18, _rock)
+	# Una choza hundida con su fogata y luces fatuas de noche.
+	var hut := _find_free(Vector2(SWAMP.x - 900, SWAMP.y + 700), 500.0)
+	if hut.is_finite():
+		_prop(swamp, V + "qt_house_03/qt_house_03.glb", Vector3(hut.x, -60, hut.y), 0.9, 270.0, 0.42, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.5, 0.52, 0.42), "fade_when_occluding": true}, true)
+	for i in 5:
+		var spot := _find_free(Vector2(SWAMP.x, SWAMP.y) + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(600.0, SWAMP.z * 0.8), 40.0)
+		if spot.is_finite():
+			_night_light(swamp, Vector3(spot.x, 120.0, spot.y), {"energy": 0.7, "color": Color(0.55, 1.0, 0.6), "light_range": 700.0, "glow_size": 60.0})
+
+
+func _swamp_tree(parent: Node3D, pos: Vector3) -> void:
+	if _rng.randf() < 0.45:
+		_prop(parent, TWISTED, pos, _rng.randf() * TAU, _rng.randf_range(32.0, 44.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": SWAMP_TINT, "fade_when_occluding": true}, false, 55.0)
+	else:
+		_prop(parent, DEAD_TREES[_rng.randi() % 2], pos, _rng.randf() * TAU, _rng.randf_range(44.0, 60.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.5, 0.55, 0.45), "fade_when_occluding": true}, false, 40.0)
+
+
+func _swamp_plant(parent: Node3D, pos: Vector3) -> void:
+	if _rng.randf() < 0.5:
+		_prop(parent, FERN, pos, _rng.randf() * TAU, _rng.randf_range(280.0, 380.0), 0.0, {"keep_only": FERN_PIECES[_rng.randi() % 4], "style": PROP_SCRIPT.Style.TINT, "tint": SWAMP_TINT})
+	else:
+		_prop(parent, SHRUB, pos, _rng.randf() * TAU, _rng.randf_range(220.0, 300.0), 0.0, {"keep_only": SHRUB_PIECES[_rng.randi() % 4], "style": PROP_SCRIPT.Style.TINT, "tint": SWAMP_TINT})
+
+
+func _build_mountain() -> void:
+	var mountain := _node("Montaña", _props)
+	# Riscos: rocas enormes alrededor, menos por donde entra el camino (sur).
+	for i in 22:
+		var angle: float = TAU * i / 22.0 + _rng.randf_range(-0.08, 0.08)
+		if absf(wrapf(angle - PI * 0.5, -PI, PI)) < 0.35:
+			continue
+		var pos := Vector2(MOUNTAIN.x, MOUNTAIN.y) + Vector2.from_angle(angle) * MOUNTAIN.z * _rng.randf_range(0.88, 1.05)
+		if _distance_to_paths(pos) < PATH_WIDTH + 700.0 or _distance_to_rivers(pos) < 900.0:
+			continue
+		_prop(mountain, BOULDERS[_rng.randi() % 2], Vector3(pos.x, 0, pos.y), _rng.randf() * TAU, _rng.randf_range(2600.0, 4200.0), 0.38, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.86, 0.9, 0.98)})
+	_scatter(mountain, MOUNTAIN, 0.0, MOUNTAIN.z, 150, _snowy_pine)
+	_scatter(mountain, MOUNTAIN, 0.0, MOUNTAIN.z, 45, _snowy_rock)
+	_scatter(mountain, MOUNTAIN, 0.0, MOUNTAIN.z, 12, _dead_tree)
+	# Atalaya en ruinas en la cima.
+	var tower := _find_free(Vector2(MOUNTAIN.x + 700, MOUNTAIN.y - 1300), 700.0)
+	if tower.is_finite():
+		_fort_piece(mountain, "modular_fort_01_tower_round", Vector3(tower.x, 0, tower.y), 0.4, 70.0)
+		_night_light(mountain, Vector3(tower.x, 600.0, tower.y), {"flames": true, "energy": 1.1, "light_range": 1100.0, "glow_size": 140.0})
+
+
+func _snowy_pine(parent: Node3D, pos: Vector3) -> void:
+	_prop(parent, PINES[_rng.randi() % 2], pos, _rng.randf() * TAU, _rng.randf_range(80.0, 112.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": SNOW_TINT, "fade_when_occluding": true}, false, 40.0)
+
+
+func _snowy_rock(parent: Node3D, pos: Vector3) -> void:
+	var piece: String = ROCK_PIECES[_rng.randi() % ROCK_PIECES.size()]
+	_prop(parent, ROCK_SET, pos + Vector3.UP * 30.0, _rng.randf() * TAU, _rng.randf_range(110.0, 200.0), 0.38, {"keep_only": piece, "style": PROP_SCRIPT.Style.TINT, "tint": Color(0.92, 0.95, 1.0)})
+
+
+func _build_coast() -> void:
+	var coast := _node("Costa", _props)
+	_scatter(coast, COAST, 0.0, COAST.z, 60, _meadow_tree)
+	_scatter(coast, COAST, 0.0, COAST.z, 50, _shrub)
+	_scatter(coast, COAST, 0.0, COAST.z, 35, _rock)
+	# En la playa: rocas grandes y troncos que trajo el mar, a lo largo de toda la orilla.
+	for i in 70:
+		var z: float = _rng.randf_range(-WALK_LIMIT + 400.0, WALK_LIMIT - 400.0)
+		var x: float = _shore_x(z) - _rng.randf_range(450.0, 1500.0)
+		var point := Vector2(x, z)
+		if _distance_to_paths(point) < PATH_WIDTH + 200.0 or _distance_to_rivers(point) < 500.0 or not _is_free(point, 160.0):
+			continue
+		if _rng.randf() < 0.45:
+			_prop(coast, BOULDERS[_rng.randi() % 2], Vector3(x, 0, z), _rng.randf() * TAU, _rng.randf_range(700.0, 1300.0), 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.85, 0.82, 0.78)})
+		else:
+			_prop(coast, DEAD_TREES[_rng.randi() % 2], Vector3(x, -40, z), _rng.randf() * TAU, _rng.randf_range(30.0, 40.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.76, 0.68)})
+	# Faro (una torre con fuego arriba) en una punta de la costa.
+	var light := _find_free(Vector2(_shore_x(-3600) - 800.0, -3600), 600.0)
+	if light.is_finite():
+		_fort_piece(coast, "modular_fort_01_tower_round", Vector3(light.x, 0, light.y), 0.0, 75.0)
+		_night_light(coast, Vector3(light.x, 1050.0, light.y), {"flames": true, "energy": 1.6, "light_range": 1500.0, "glow_size": 220.0})
+	# Restos del naufragio: un campamento con cajones en la arena.
+	var wreck := _find_free(Vector2(_shore_x(-2600) - 900.0, -2600), 300.0)
+	if wreck.is_finite():
+		_camp(coast, Vector3(wreck.x, 0, wreck.y), 7)
+		_prop(coast, P + "stone_fire_pit/stone_fire_pit_1k.gltf", Vector3(wreck.x + 380, 0, wreck.y), 0.0, 300.0, 0.45, {"is_fire": true, "fire_height": 80.0})
+
+
+func _build_desert() -> void:
+	var desert := _node("Desierto", _props)
+	# Mesetas: rocas enormes del color de la arena.
+	for i in 14:
+		var pos := _find_free(Vector2(DESERT.x, DESERT.y) + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(1200.0, DESERT.z * 1.05), 900.0)
+		if pos.is_finite() and _distance_to_paths(pos) > PATH_WIDTH + 900.0:
+			_prop(desert, BOULDERS[_rng.randi() % 2], Vector3(pos.x, 0, pos.y), _rng.randf() * TAU, _rng.randf_range(2200.0, 3600.0), 0.38, {"style": PROP_SCRIPT.Style.TINT, "tint": SAND_TINT})
+	_scatter(desert, DESERT, 0.0, DESERT.z, 45, _sand_rock)
+	_scatter(desert, DESERT, 0.0, DESERT.z, 28, _bleached_tree)
+	# Templo enterrado en la arena: muros, columnas, la estatua y vasijas.
+	var c := Vector2(DESERT.x + 900, DESERT.y + 900)
+	var temple := {"style": PROP_SCRIPT.Style.TINT, "tint": SAND_TINT}
+	# Las piezas del kit del cementerio, en piedra (como alla) teñida de arena.
+	var temple_stone := {"style": PROP_SCRIPT.Style.STONE, "tint": SAND_TINT}
+	_fort_piece(desert, "modular_fort_01_wall_thick_straight_01", Vector3(c.x - 700, -120, c.y - 300), 0.3, 90.0)
+	_fort_piece(desert, "modular_fort_01_wall_thick_corner_01", Vector3(c.x + 600, -150, c.y - 700), 1.2, 90.0)
+	_fort_piece(desert, "modular_fort_01_wall_thin_gate_01", Vector3(c.x - 100, -80, c.y + 650), PI * 0.5, 95.0)
+	for offset in [Vector2(-350, -350), Vector2(350, -350), Vector2(-350, 350), Vector2(350, 350)]:
+		_prop(desert, G + "column-large.glb", Vector3(c.x + offset.x, -60, c.y + offset.y), 0.0, 420.0, 0.45, temple_stone)
+	_prop(desert, P + "gothic_statue/gothic_statue_1k.gltf", Vector3(c.x, 120, c.y), PI, 270.0, 0.35, temple)
+	for i in 6:
+		var urn := _find_free(c + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(500.0, 900.0), 40.0)
+		if urn.is_finite():
+			_prop(desert, G + "urn-round.glb", Vector3(urn.x, 0, urn.y), _rng.randf() * TAU, 380.0, 0.4, temple_stone)
+
+
+func _sand_rock(parent: Node3D, pos: Vector3) -> void:
+	if _rng.randf() < 0.6:
+		var piece: String = ROCK_PIECES[_rng.randi() % ROCK_PIECES.size()]
+		_prop(parent, ROCK_SET, pos + Vector3.UP * 30.0, _rng.randf() * TAU, _rng.randf_range(100.0, 190.0), 0.38, {"keep_only": piece, "style": PROP_SCRIPT.Style.TINT, "tint": SAND_TINT})
+	else:
+		_prop(parent, BOULDERS[_rng.randi() % 2], pos, _rng.randf() * TAU, _rng.randf_range(800.0, 1400.0), 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": SAND_TINT})
+
+
+func _bleached_tree(parent: Node3D, pos: Vector3) -> void:
+	_prop(parent, DEAD_TREES[_rng.randi() % 2], pos, _rng.randf() * TAU, _rng.randf_range(40.0, 54.0), 0.0,
+			{"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.95, 0.88, 0.78), "fade_when_occluding": true}, false, 40.0)
+
+
+# --- Gente de la aldea y eventos del camino -----------------------------------
+
+const GUARD_MODEL := "res://assets/characters/oad/characters/warrior.glb"
+## Aldeanos: modelo y color de la ropa (multiplica la textura).
+const VILLAGER_LOOKS := [
+	["res://assets/characters/oad/characters/merchant.glb", Color(1, 1, 1)],
+	["res://assets/characters/oad/characters/priest.glb", Color(0.85, 0.82, 0.75)],
+	["res://assets/characters/oad/characters/hunter.glb", Color(1, 1, 1)],
+	["res://assets/characters/oad/characters/merchant.glb", Color(0.7, 0.8, 1.0)],
+	["res://assets/characters/oad/characters/blacksmith.glb", Color(0.9, 0.8, 0.7)],
+	["res://assets/characters/oad/characters/hunter.glb", Color(1.0, 0.85, 0.75)],
+	["res://assets/characters/oad/characters/priest.glb", Color(1.0, 1.0, 1.0)],
+	["res://assets/characters/oad/characters/merchant.glb", Color(0.85, 1.0, 0.8)],
+]
+## Lugares de la aldea donde andan los aldeanos de dia (x, z).
+const VILLAGE_SPOTS := [Vector2(-100, 380), Vector2(-780, -120), Vector2(260, 50), Vector2(-450, -1000), Vector2(-900, 1250),
+		Vector2(800, 1600), Vector2(1700, -250), Vector2(300, -900), Vector2(-1300, -500), Vector2(1100, 600), Vector2(-500, 1700), Vector2(1500, -1500)]
+## Casas (centro) de la aldea: los aldeanos se van a la suya de noche.
+const VILLAGE_HOUSES := [Vector2(-1350, -1150), Vector2(1000, -1250), Vector2(1500, 350), Vector2(-1600, 950), Vector2(1150, 1150),
+		Vector2(-1950, -2150), Vector2(1950, -2200), Vector2(2000, 1750), Vector2(-2000, 1800)]
+
+
+func _build_people() -> void:
+	var people := _node("Gente", _root)
+	# Dos guardias adentro de cada porton, mirando hacia afuera.
+	for gate in _gates:
+		for side in [-1.0, 1.0]:
+			var spot: Vector2 = gate.center - gate.normal * 320.0 + gate.along * side * 420.0
+			var guard := CharacterBody3D.new()
+			guard.name = "Guardia"
+			guard.set_script(load(GUARD_SCRIPT))
+			guard.transform = Transform3D(Basis(Vector3.UP, atan2(gate.normal.x, gate.normal.y)), Vector3(spot.x, 0, spot.y))
+			people.add_child(guard, true)
+	var plaza := Vector2(VILLAGE.x, VILLAGE.y)
+	for i in VILLAGER_LOOKS.size():
+		var villager := CharacterBody3D.new()
+		villager.name = "Aldeano"
+		villager.set_script(load(VILLAGER_SCRIPT))
+		var house: Vector2 = VILLAGE_HOUSES[i % VILLAGE_HOUSES.size()]
+		var door: Vector2 = house + (plaza - house).normalized() * 470.0
+		villager.model_path = VILLAGER_LOOKS[i][0]
+		villager.tint = VILLAGER_LOOKS[i][1]
+		villager.home = Vector3(door.x, 0, door.y)
+		var spots := PackedVector3Array()
+		for k in 3:
+			var spot: Vector2 = VILLAGE_SPOTS[(i * 5 + k * 3) % VILLAGE_SPOTS.size()]
+			spots.append(Vector3(spot.x, 0, spot.y))
+		villager.spots = spots
+		villager.position = Vector3(door.x, 0, door.y)
+		people.add_child(villager, true)
+
+
+func _build_events() -> void:
+	var events := Node3D.new()
+	events.name = "EventosDelCamino"
+	events.set_script(load(EVENTS_SCRIPT))
+	var roads: Array[PackedVector2Array] = []
+	for path in _paths:
+		roads.append(PackedVector2Array(path))
+	events.roads = roads
+	var avoid := PackedVector2Array()
+	for bridge in _bridges:
+		avoid.append(bridge.center)
+	events.avoid_points = avoid
+	events.village_center = Vector2(VILLAGE.x, VILLAGE.y)
+	events.village_half = WALL_HALF + 900.0
+	_root.add_child(events)
+
+
+# --- Lineas suaves ------------------------------------------------------------
+
+## Suaviza una linea (Chaikin) dejando fijos la primera y la ultima punta.
+func _smooth(points: PackedVector2Array, passes: int) -> PackedVector2Array:
+	for pass_index in passes:
+		var result := PackedVector2Array([points[0]])
+		for i in points.size() - 1:
+			result.append(points[i].lerp(points[i + 1], 0.25))
+			result.append(points[i].lerp(points[i + 1], 0.75))
+		result.append(points[points.size() - 1])
+		points = result
+	return points
+
+
+## Puntos cada step a lo largo de la linea.
+func _resample(points: PackedVector2Array, step: float) -> PackedVector2Array:
+	var result := PackedVector2Array([points[0]])
+	var carry: float = 0.0
+	for i in points.size() - 1:
+		var a: Vector2 = points[i]
+		var b: Vector2 = points[i + 1]
+		var length: float = a.distance_to(b)
+		var t: float = step - carry
+		while t <= length:
+			result.append(a.lerp(b, t / length))
+			t += step
+		carry = length - (t - step)
+	if result[result.size() - 1].distance_to(points[points.size() - 1]) > step * 0.3:
+		result.append(points[points.size() - 1])
+	return result
