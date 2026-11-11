@@ -23,8 +23,9 @@ con licencia [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 
 En `assets/fonts/`, cada una con su `OFL.txt`:
 
-- **Cinzel** (títulos y encabezados): Natanael Gama, The Cinzel Project Authors.
-  https://github.com/NDISCOVER/Cinzel
+- **New Rocker** (títulos, encabezados y botones del menú): Pablo Impallari,
+  Brenda Gallo y Rodrigo Fuenzalida. https://fonts.google.com/specimen/New+Rocker
+  (nombre de fuente reservado "New Rocker").
 - **EB Garamond** (texto): Georg Duffner y Octavio Pardo, The EB Garamond
   Project Authors. https://github.com/octaviopardo/EBGaramond12
 

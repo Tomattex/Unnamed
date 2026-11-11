@@ -451,6 +451,9 @@ static func particles(texture: Texture2D, additive: bool, frames: int, amount: i
 	system.amount = amount
 	system.lifetime = lifetime
 	system.local_coords = false
+	# Sin sombra: el pase de sombras no mira el alfa, y el humo o el polvo
+	# todavia invisibles dejaban manchas negras en el piso.
+	system.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if frames > 1:
 		system.anim_offset_max = 1.0
 	return system

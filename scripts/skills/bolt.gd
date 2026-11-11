@@ -5,7 +5,9 @@ extends Node3D
 ## color y deja una estela. harmless = solo se ve (la lluvia de virotes hace el
 ## daño aparte). hits_player = la tiro un enemigo (los bandidos arqueros): daña
 ## al jugador y no a los enemigos. arrow = flecha de arco: mas larga y fina,
-## con plumas.
+## con plumas. orb = no es un virote sino un orbe de energia del color de glow
+## (rayo arcano y ataque del mago, ver SpellFx.arcane_orb), que estalla al
+## tocar o al llegar a su alcance.
 
 const HIT_RADIUS: float = 40.0
 ## Ancho del jugador para las flechas enemigas.
@@ -20,11 +22,18 @@ var glow: Color = Color.TRANSPARENT
 var harmless: bool = false
 var hits_player: bool = false
 var arrow: bool = false
+var orb: bool = false
+## Tamaño del orbe (el rayo arcano es mas grande que el ataque comun).
+var orb_size: float = 1.0
 
 var _traveled: float = 0.0
+var _orb_trails: Array[CPUParticles3D] = []
 
 
 func _ready() -> void:
+	if orb:
+		_orb_trails = SpellFx.arcane_orb(self, glow, orb_size)
+		return
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(0.45, 0.32, 0.18)
 	var shaft := BoxMesh.new()
@@ -92,10 +101,18 @@ func _physics_process(delta: float) -> void:
 			else:
 				target.take_hit(hit)
 				sfx.play_at("hit", global_position, -2.0)
-			queue_free()
+			_finish()
 			return
 	if _traveled >= max_range:
-		queue_free()
+		_finish()
+
+
+# El orbe estalla (y su estela se apaga sola); el virote solo desaparece.
+func _finish() -> void:
+	if orb:
+		SpellFx.arcane_impact(get_parent(), global_position, glow, orb_size)
+		SpellFx.release(self, _orb_trails)
+	queue_free()
 
 
 # El primero al que esta tocando: un enemigo, o el jugador si la tiro un enemigo.

@@ -10,7 +10,7 @@ extends CanvasLayer
 const OptionsPanel := preload("res://ui/options_panel.gd")
 const FLAME := preload("res://fx/textures/flame_strip.png")
 const SOFT := preload("res://fx/textures/circle_05.png")
-const TITLE_FONT := preload("res://assets/fonts/cinzel/Cinzel[wght].ttf")
+const TITLE_FONT := preload("res://assets/fonts/newrocker/NewRocker-Regular.ttf")
 
 const GOLD := Color(0.95, 0.8, 0.48)
 const PARCHMENT := Color(0.86, 0.79, 0.64)
@@ -68,10 +68,11 @@ func _start_camera() -> void:
 	_update_camera(0.0)
 
 
+# New Rocker tiene un solo peso: el "peso" pedido se simula engrosando un poco.
 func _variation(weight: int) -> FontVariation:
 	var font := FontVariation.new()
 	font.base_font = TITLE_FONT
-	font.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
+	font.variation_embolden = clampf((weight - 500) / 400.0, 0.0, 0.6)
 	return font
 
 
@@ -394,7 +395,7 @@ func _credits_text() -> String:
 		"Ylmir · stephan (pdsounds.org) · Luke.RUSTLTD · VishwaJai · themightyglider · Darsycho · rubberduck · EZduzziteh · US Fish & Wildlife Service",
 		"",
 		"[color=#%s][b]Fuentes (SIL OFL)[/b][/color]" % gold,
-		"Cinzel — Natanael Gama · EB Garamond — Georg Duffner, Octavio Pardo",
+		"New Rocker — Pablo Impallari, Brenda Gallo, Rodrigo Fuenzalida · EB Garamond — Georg Duffner, Octavio Pardo",
 		"",
 		"[color=#%s]El detalle de cada pieza está en CREDITS.md.[/color]" % DIM.to_html(false),
 	])

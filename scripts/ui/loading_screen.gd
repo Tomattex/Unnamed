@@ -7,7 +7,7 @@ extends CanvasLayer
 ## pantalla tapa el salto y le da a la camara, la navegacion y los enemigos
 ## unos cuadros para acomodarse.
 
-const TITLE_FONT := preload("res://assets/fonts/cinzel/Cinzel[wght].ttf")
+const TITLE_FONT := preload("res://assets/fonts/newrocker/NewRocker-Regular.ttf")
 const TEXT_FONT := preload("res://assets/fonts/ebgaramond/EBGaramond-Italic[wght].ttf")
 const GOLD := Color(0.95, 0.8, 0.48)
 const DIM := Color(0.62, 0.56, 0.46)

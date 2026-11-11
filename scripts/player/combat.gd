@@ -91,6 +91,9 @@ func _perform(skill: SkillData, level: int, aim_point: Vector3, target: Node3D) 
 	skill_animation.emit(skill.animation, skill.animation_speed)
 	if not skill.sound.is_empty():
 		sfx.play_at(skill.sound, character.global_position)
+	# Los hechizos se ven al lanzarlos: sigilo en el piso y luz en las manos.
+	if skill.spell:
+		SpellFx.cast(character, skill.effect_color, 1.35 if skill.kind == SkillData.Kind.RAIN else 1.0)
 	match skill.kind:
 		SkillData.Kind.STRIKE:
 			_strike(skill, level, target)
@@ -116,15 +119,16 @@ func _strike(skill: SkillData, level: int, target: Node3D) -> void:
 
 
 func _whirlwind(skill: SkillData, level: int) -> void:
-	Effects.ring(character.get_parent(), character.global_position, skill.effect_color, skill.radius)
+	if skill.damage_type == Damage.Type.FIRE and not skill.spin:
+		# Anillo de llamas: una ola de fuego que sale del lanzador.
+		SpellFx.flame_nova(character.get_parent(), character.global_position, skill.radius)
+	else:
+		Effects.ring(character.get_parent(), character.global_position, skill.effect_color, skill.radius)
 	if skill.spin:
 		Effects.whirl(character, skill.effect_color, skill.radius * 0.8)
-	else:
+	elif skill.damage_type != Damage.Type.FIRE:
 		Effects.shockwave(character.get_parent(), character.global_position, skill.effect_color, skill.radius, 0.45)
-		if skill.damage_type == Damage.Type.FIRE:
-			Effects.fire_explosion(character.get_parent(), character.global_position, skill.radius * 0.6)
-		else:
-			Effects.dust_puff(character.get_parent(), character.global_position, skill.radius * 0.7)
+		Effects.dust_puff(character.get_parent(), character.global_position, skill.radius * 0.7)
 	await get_tree().create_timer(0.2, false).timeout
 	if player_stats.dead:
 		return
@@ -174,6 +178,11 @@ func _volley(skill: SkillData, level: int, aim_point: Vector3) -> void:
 		var bolt: Node3D = _make_bolt(direction.rotated(Vector3.UP, deg_to_rad(offset)), _roll_skill_hit(skill, level), skill.max_range)
 		if skill.damage_type != Damage.Type.PHYSICAL:
 			bolt.glow = skill.effect_color
+		# Los hechizos (rayo arcano) son orbes de energia, no virotes.
+		if skill.spell:
+			bolt.orb = true
+			bolt.orb_size = 1.3
+			bolt.speed = 2100.0
 		Effects.add_at(character.get_parent(), bolt, character.global_position + Vector3.UP * 230.0 + bolt.direction * 60.0)
 	if not skill.spell:
 		sfx.play_at("bow_shoot", character.global_position)
@@ -183,12 +192,16 @@ func _volley(skill: SkillData, level: int, aim_point: Vector3) -> void:
 func _rain(skill: SkillData, level: int, aim_point: Vector3) -> void:
 	var center := Vector3(aim_point.x, 0.0, aim_point.z)
 	var parent: Node = character.get_parent()
-	Effects.ring(parent, center, skill.effect_color, skill.radius)
-	Effects.ground_glow(parent, center + Vector3.UP * 4.0, Effects.GLOW, skill.effect_color, skill.radius * 2.0, skill.delay + 0.3)
+	if skill.damage_type == Damage.Type.FIRE:
+		SpellFx.meteor_mark(parent, center, skill.radius, skill.delay)
+	else:
+		Effects.ring(parent, center, skill.effect_color, skill.radius)
+		Effects.ground_glow(parent, center + Vector3.UP * 4.0, Effects.GLOW, skill.effect_color, skill.radius * 2.0, skill.delay + 0.3)
 	if skill.damage_type == Damage.Type.FIRE:
 		# Meteoro: la bola de fuego cae desde arriba y explota al tocar el piso.
 		var ball: Node3D = FIREBALL.new()
-		ball.direction = (Vector3.DOWN * RAIN_HEIGHT + Vector3(-300.0, 0.0, -200.0)).normalized()
+		# Entra en diagonal desde el fondo de la pantalla: asi se lo ve cruzar.
+		ball.direction = (Vector3.DOWN * RAIN_HEIGHT + Vector3(-250.0, 0.0, -750.0)).normalized()
 		ball.skill = skill
 		ball.skill_level = level
 		ball.color = skill.effect_color
@@ -243,6 +256,14 @@ func _buff(skill: SkillData, level: int) -> void:
 	})
 	Effects.aura(character.get_parent(), character.global_position, skill.effect_color)
 	floating_text.spawn(character.global_position + Vector3.UP * 450.0, skill.name, skill.effect_color, 22)
+	# Mientras dura: burbuja si protege (Escudo Arcano, Piel de Piedra) o un
+	# aura si da mas daño (Furia, Ojo de Halcon).
+	var duration: float = skill.buff_duration_at(level)
+	if skill.buff_defense_at(level) > 0 or skill.buff_resistance_at(level) > 0.0:
+		SpellFx.cast(character, skill.effect_color, 1.2)
+		SpellFx.protection_bubble(character, skill.effect_color, duration, skill.buff_resistance_at(level) < skill.buff_defense_at(level))
+	elif skill.buff_damage_at(level) > 1.0 or skill.buff_speed_at(level) > 1.0:
+		SpellFx.power_aura(character, skill.effect_color, duration)
 
 
 func _deliver_hit(target: Node3D, delay: float, offhand: bool = false) -> void:
@@ -267,6 +288,8 @@ func _shoot_bolt(direction: Vector3, hit: Dictionary) -> void:
 	var spell: bool = player_stats.uses_spell_attack()
 	if spell:
 		bolt.glow = ARCANE_COLOR
+		bolt.orb = true
+		bolt.orb_size = 0.8
 	var weapon: Itemdata = player_stats.get_weapon()
 	if weapon and weapon.bow:
 		bolt.arrow = true

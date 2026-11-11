@@ -12,7 +12,12 @@
 [ext_resource type="Texture2D" path="res://ui/theme/textures/fill_xp.png" id="tex_fill_xp"]
 [ext_resource type="Texture2D" path="res://ui/theme/textures/fill_enemy.png" id="tex_fill_enemy"]
 [ext_resource type="FontFile" path="res://assets/fonts/ebgaramond/EBGaramond[wght].ttf" id="font_body"]
-[ext_resource type="FontFile" path="res://assets/fonts/cinzel/Cinzel[wght].ttf" id="font_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/newrocker/NewRocker-Regular.ttf" id="font_title"]
+[ext_resource type="Texture2D" path="res://ui/theme/textures/menu_button_normal.png" id="tex_menu_button_normal"]
+[ext_resource type="Texture2D" path="res://ui/theme/textures/menu_button_hover.png" id="tex_menu_button_hover"]
+[ext_resource type="Texture2D" path="res://ui/theme/textures/menu_button_pressed.png" id="tex_menu_button_pressed"]
+[ext_resource type="Texture2D" path="res://ui/theme/textures/menu_button_disabled.png" id="tex_menu_button_disabled"]
+[ext_resource type="Texture2D" path="res://ui/theme/textures/menu_panel.png" id="tex_menu_panel"]
 
 [sub_resource type="FontVariation" id="Font_body"]
 base_font = ExtResource("font_body")
@@ -20,8 +25,67 @@ variation_opentype = {2003265652: 520}
 
 [sub_resource type="FontVariation" id="Font_header"]
 base_font = ExtResource("font_title")
-variation_opentype = {2003265652: 600}
-spacing_glyph = 1
+
+[sub_resource type="StyleBoxTexture" id="StyleBox_menu_panel"]
+content_margin_left = 34.0
+content_margin_top = 26.0
+content_margin_right = 34.0
+content_margin_bottom = 24.0
+texture = ExtResource("tex_menu_panel")
+texture_margin_left = 20.0
+texture_margin_top = 20.0
+texture_margin_right = 20.0
+texture_margin_bottom = 20.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
+
+[sub_resource type="StyleBoxTexture" id="StyleBox_menu_button_normal"]
+content_margin_left = 44.0
+content_margin_top = 8.0
+content_margin_right = 44.0
+content_margin_bottom = 8.0
+texture = ExtResource("tex_menu_button_normal")
+texture_margin_left = 32.0
+texture_margin_top = 12.0
+texture_margin_right = 32.0
+texture_margin_bottom = 12.0
+axis_stretch_horizontal = 2
+
+[sub_resource type="StyleBoxTexture" id="StyleBox_menu_button_hover"]
+content_margin_left = 44.0
+content_margin_top = 8.0
+content_margin_right = 44.0
+content_margin_bottom = 8.0
+texture = ExtResource("tex_menu_button_hover")
+texture_margin_left = 32.0
+texture_margin_top = 12.0
+texture_margin_right = 32.0
+texture_margin_bottom = 12.0
+axis_stretch_horizontal = 2
+
+[sub_resource type="StyleBoxTexture" id="StyleBox_menu_button_pressed"]
+content_margin_left = 44.0
+content_margin_top = 10.0
+content_margin_right = 44.0
+content_margin_bottom = 6.0
+texture = ExtResource("tex_menu_button_pressed")
+texture_margin_left = 32.0
+texture_margin_top = 12.0
+texture_margin_right = 32.0
+texture_margin_bottom = 12.0
+axis_stretch_horizontal = 2
+
+[sub_resource type="StyleBoxTexture" id="StyleBox_menu_button_disabled"]
+content_margin_left = 44.0
+content_margin_top = 8.0
+content_margin_right = 44.0
+content_margin_bottom = 8.0
+texture = ExtResource("tex_menu_button_disabled")
+texture_margin_left = 32.0
+texture_margin_top = 12.0
+texture_margin_right = 32.0
+texture_margin_bottom = 12.0
+axis_stretch_horizontal = 2
 
 [sub_resource type="StyleBoxTexture" id="StyleBox_panel"]
 content_margin_left = 16.0
@@ -182,6 +246,22 @@ HealthBar/styles/background = SubResource("StyleBox_bar_bg")
 HealthBar/styles/fill = SubResource("StyleBox_health_fill")
 Label/colors/font_color = Color(0.88, 0.82, 0.68, 1)
 Label/colors/font_outline_color = Color(0, 0, 0, 1)
+OrnateButton/base_type = &"Button"
+OrnateButton/colors/font_color = Color(0.92, 0.84, 0.66, 1)
+OrnateButton/colors/font_disabled_color = Color(0.5, 0.47, 0.42, 1)
+OrnateButton/colors/font_hover_color = Color(1, 0.9, 0.58, 1)
+OrnateButton/colors/font_outline_color = Color(0.08, 0.05, 0.02, 1)
+OrnateButton/colors/font_pressed_color = Color(1, 0.82, 0.45, 1)
+OrnateButton/constants/outline_size = 6
+OrnateButton/font_sizes/font_size = 21
+OrnateButton/fonts/font = ExtResource("font_title")
+OrnateButton/styles/disabled = SubResource("StyleBox_menu_button_disabled")
+OrnateButton/styles/focus = SubResource("StyleBox_focus")
+OrnateButton/styles/hover = SubResource("StyleBox_menu_button_hover")
+OrnateButton/styles/normal = SubResource("StyleBox_menu_button_normal")
+OrnateButton/styles/pressed = SubResource("StyleBox_menu_button_pressed")
+OrnatePanel/base_type = &"PanelContainer"
+OrnatePanel/styles/panel = SubResource("StyleBox_menu_panel")
 Panel/styles/panel = SubResource("StyleBox_panel")
 PanelContainer/styles/panel = SubResource("StyleBox_panel")
 ProgressBar/colors/font_color = Color(1, 0.95, 0.85, 1)
@@ -192,6 +272,15 @@ ProgressBar/styles/background = SubResource("StyleBox_bar_bg")
 ProgressBar/styles/fill = SubResource("StyleBox_xp_fill")
 SlotPanel/base_type = &"PanelContainer"
 SlotPanel/styles/panel = SubResource("StyleBox_slot")
+TitleLabel/base_type = &"Label"
+TitleLabel/colors/font_color = Color(0.96, 0.78, 0.38, 1)
+TitleLabel/colors/font_outline_color = Color(0.1, 0.05, 0.02, 1)
+TitleLabel/colors/font_shadow_color = Color(0, 0, 0, 0.75)
+TitleLabel/constants/outline_size = 8
+TitleLabel/constants/shadow_offset_x = 2
+TitleLabel/constants/shadow_offset_y = 3
+TitleLabel/font_sizes/font_size = 46
+TitleLabel/fonts/font = ExtResource("font_title")
 TooltipLabel/colors/font_color = Color(0.88, 0.82, 0.68, 1)
 TooltipPanel/styles/panel = SubResource("StyleBox_tooltip")
 XPBar/base_type = &"ProgressBar"

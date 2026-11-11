@@ -30,6 +30,15 @@ const WORN_PLANK := Rect2i(41, 362, 231, 52)
 ## repitiendo hacia abajo las filas limpias de arriba.
 const PLANK_SIDE: int = 8
 const PLANK_CLEAN_ROWS := Vector2i(6, 9)
+## Para el menu del juego: el tablon entero, con las puntas de flecha (con
+## un poco de margen para la sombra), la barra dorada para separar y las
+## puntas sueltas que flanquean el titulo.
+const TIPPED_PLANK := Rect2i(12, 124, 287, 58)
+const TIPPED_PLANK_BRIGHT := Rect2i(12, 202, 287, 58)
+const TIPPED_PLANK_WORN := Rect2i(12, 358, 287, 58)
+const GOLD_RULE := Rect2i(796, 74, 204, 14)
+const TIP_LEFT := Rect2i(378, 257, 36, 38)
+const TIP_RIGHT := Rect2i(540, 256, 36, 38)
 
 var _atlas: Image
 var _wood: Image
@@ -51,6 +60,16 @@ func _initialize() -> void:
 	_save(_tinted(plank, Color(0.95, 0.88, 0.76)), "button_hover")
 	_save(_tinted(plank, Color(0.5, 0.47, 0.42)), "button_pressed")
 	_save(_tinted(_desaturated(_fixed_plank(WORN_PLANK)), Color(0.45, 0.44, 0.42)), "button_disabled")
+
+	# Menu del juego: tablones con puntas, panel mas oscuro y adornos.
+	_save(_tinted(_atlas.get_region(TIPPED_PLANK), Color(0.62, 0.57, 0.5)), "menu_button_normal")
+	_save(_tinted(_atlas.get_region(TIPPED_PLANK_BRIGHT), Color(1.0, 0.9, 0.74)), "menu_button_hover")
+	_save(_tinted(_atlas.get_region(TIPPED_PLANK), Color(0.42, 0.38, 0.33)), "menu_button_pressed")
+	_save(_tinted(_desaturated(_atlas.get_region(TIPPED_PLANK_WORN)), Color(0.42, 0.41, 0.39)), "menu_button_disabled")
+	_save(_framed(THICK_FRAME, _tinted(_wood, Color(0.27, 0.23, 0.19)), 2), "menu_panel")
+	_save(_atlas.get_region(GOLD_RULE), "gold_rule")
+	_save(_atlas.get_region(TIP_LEFT), "tip_left")
+	_save(_atlas.get_region(TIP_RIGHT), "tip_right")
 
 	_save(_bar_fill(Color(0.72, 0.1, 0.07)), "fill_health")
 	_save(_bar_fill(Color(0.78, 0.6, 0.18)), "fill_xp")
