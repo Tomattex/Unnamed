@@ -85,10 +85,10 @@ func _setup_environment(environment: Environment) -> void:
 	environment.ambient_light_sky_contribution = 0.55
 	# Brillo suave alrededor de lo muy luminoso (fuego, hechizos, faroles).
 	environment.glow_enabled = true
-	environment.glow_intensity = 0.6
+	environment.glow_intensity = 0.5
 	environment.glow_strength = 0.9
 	environment.glow_bloom = 0.0
-	environment.glow_hdr_threshold = 1.1
+	environment.glow_hdr_threshold = 1.5
 	environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 
 

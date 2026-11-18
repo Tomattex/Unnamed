@@ -70,21 +70,24 @@ const DEAD_TREES := [O + "muerto_a.glb", O + "muerto_b.glb", O + "roble_seco_b.g
 const WILLOWS := [O + "sauce_a.glb", O + "sauce_b.glb"]
 const BUSHES := [O + "arbusto_a.glb", O + "arbusto_b.glb", O + "arbusto_c.glb", O + "arbusto_d.glb"]
 const FERNS := [O + "helecho_a.glb", O + "helecho_b.glb"]
-## Escala (minima, maxima) de cada tipo: robles y olmos de 7 a 9 metros,
-## abetos de 6 a 8, abedules de 5 a 7.
-const OAK_SCALE := Vector2(135.0, 175.0)
-const ELM_SCALE := Vector2(130.0, 165.0)
-const BIRCH_SCALE := Vector2(190.0, 240.0)
-const FIR_SCALE := Vector2(200.0, 270.0)
-const DEAD_SCALE := Vector2(120.0, 165.0)
-const WILLOW_SCALE := Vector2(150.0, 190.0)
-const BUSH_SCALE := Vector2(150.0, 210.0)
+## Escala (minima, maxima) de cada tipo: los arboles quedan de 2 a 3 veces el
+## alto del jugador (unas 900 a 1350 unidades). A tamaño real (7 a 10 m) la
+## camara, que anda a unas 700 de alto, quedaba metida adentro de las copas.
+const OAK_SCALE := Vector2(80.0, 100.0)
+const ELM_SCALE := Vector2(80.0, 95.0)
+const BIRCH_SCALE := Vector2(140.0, 170.0)
+const FIR_SCALE := Vector2(130.0, 160.0)
+const DEAD_SCALE := Vector2(85.0, 110.0)
+const WILLOW_SCALE := Vector2(110.0, 130.0)
+const BUSH_SCALE := Vector2(100.0, 150.0)
 const FERN_SCALE := Vector2(130.0, 190.0)
 ## Lugar libre alrededor de cofres y santuarios (el botin y el sigilo).
 const CHEST_CLEARANCE: float = 170.0
 const SHRINE_CLEARANCE: float = 320.0
 ## Radio del circulo de menhires de cada santuario.
 const MENHIR_RING: float = 470.0
+## Escala del barco naufragado de la costa (14 m de largo es demasiado).
+const WRECK_SCALE: float = 120.0
 ## Lugar que ocupa un arbol para lo demas (fraccion del ancho de su copa).
 const TREE_ROOM: float = 0.3
 ## Radio de la colision del tronco (unidades del mundo).
@@ -441,6 +444,26 @@ func _box_on_road(box: Dictionary, margin: float) -> bool:
 	return false
 
 
+## El lugar libre mas cercano a wanted donde entra entera la caja del modelo
+## (sin pisar nada, caminos ni agua). Vector2.INF si no hay.
+func _settle_box(path: String, wanted: Vector2, angle: float, scale: float, margin: float = 60.0) -> Vector2:
+	var bounds: AABB = _bounds_of(path, "")
+	for ring in 30:
+		var steps: int = maxi(1, ring * 6)
+		for i in steps:
+			var spot: Vector2 = wanted + Vector2.from_angle(TAU * i / steps) * ring * 60.0
+			var middle: Vector3 = Basis(Vector3.UP, angle) * (bounds.get_center() * scale)
+			var box: Dictionary = _box(spot + Vector2(middle.x, middle.z), angle, Vector2(bounds.size.x, bounds.size.z) * scale * 0.5)
+			var dry: bool = _distance_to_rivers(box.c) > box.half.length() + 200.0
+			for sx in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var corner: Vector2 = box.c + box.ax * box.half.x * sx + box.az * box.half.y * sz
+					dry = dry and corner.x < _shore_x(corner.y) - 120.0
+			if dry and _box_free(box, margin) and not _box_on_road(box, margin):
+				return spot
+	return Vector2.INF
+
+
 ## Corral de cerco de piedra (seis tramos, uno abierto hacia la plaza) en el
 ## primer lugar cerca de wanted donde entra entero.
 func _corral(parent: Node3D, wanted: Vector2) -> void:
@@ -609,7 +632,7 @@ func _build_border() -> void:
 				pos += Vector3(_rng2.randf_range(-120, 120), 0, _rng2.randf_range(-120, 120))
 				var snowy: bool = pos.z < -12000.0
 				var fir: bool = _rng2.randf() < 0.6 or snowy
-				var path: String = (SNOW_FIRS if snowy else FIRS).pick_random() if fir else OAKS.pick_random()
+				var path: String = _any(SNOW_FIRS if snowy else FIRS, _rng2) if fir else _any(OAKS, _rng2)
 				var size: Vector2 = FIR_SCALE if fir else OAK_SCALE
 				_prop(border, path, pos, _rng2.randf() * TAU, _rng2.randf_range(size.x, size.y) * 1.2, 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT * 0.85})
 		t += 480.0
@@ -671,6 +694,12 @@ func _statue(parent: Node3D, wanted: Vector3, height: float, options: Dictionary
 const PEDESTAL_WIDTH: float = 460.0
 
 
+## Uno de la lista con el generador del mundo (pick_random usa el global y
+## el mundo dejaba de salir igual cada vez).
+func _any(list: Array, rng: RandomNumberGenerator = null) -> Variant:
+	return list[(rng if rng else _rng).randi() % list.size()]
+
+
 ## Arbol de una lista con su rango de escala, tinte y colision de tronco.
 func _tree(parent: Node3D, paths: Array, pos: Vector3, size: Vector2, tint: Color = FOLIAGE_TINT) -> void:
 	_prop(parent, paths[_rng.randi() % paths.size()], pos, _rng.randf() * TAU, _rng.randf_range(size.x, size.y), 0.0,
@@ -721,11 +750,11 @@ func _rock(parent: Node3D, pos: Vector3) -> void:
 
 
 func _fern(parent: Node3D, pos: Vector3) -> void:
-	_prop(parent, FERNS.pick_random(), pos, _rng.randf() * TAU, _rng.randf_range(FERN_SCALE.x, FERN_SCALE.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT})
+	_prop(parent, _any(FERNS), pos, _rng.randf() * TAU, _rng.randf_range(FERN_SCALE.x, FERN_SCALE.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT})
 
 
 func _shrub(parent: Node3D, pos: Vector3) -> void:
-	_prop(parent, BUSHES.pick_random(), pos, _rng.randf() * TAU, _rng.randf_range(BUSH_SCALE.x, BUSH_SCALE.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT})
+	_prop(parent, _any(BUSHES), pos, _rng.randf() * TAU, _rng.randf_range(BUSH_SCALE.x, BUSH_SCALE.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": FOLIAGE_TINT})
 
 
 func _stump(parent: Node3D, pos: Vector3) -> void:
@@ -1682,6 +1711,7 @@ func _keep_connected(nav_mesh: NavigationMesh, seed_point: Vector3) -> int:
 # --- Guardar ---------------------------------------------------------------
 
 func _save() -> void:
+	_root.get_node("Gente").process_mode = Node.PROCESS_MODE_INHERIT
 	var packed := PackedScene.new()
 	var error: Error = packed.pack(_root)
 	if error != OK:
@@ -2101,7 +2131,7 @@ func _swamp_tree(parent: Node3D, pos: Vector3) -> void:
 func _swamp_plant(parent: Node3D, pos: Vector3) -> void:
 	var paths: Array = FERNS if _rng.randf() < 0.5 else BUSHES
 	var size: Vector2 = FERN_SCALE if paths == FERNS else BUSH_SCALE
-	_prop(parent, paths.pick_random(), pos, _rng.randf() * TAU, _rng.randf_range(size.x, size.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": SWAMP_TINT})
+	_prop(parent, _any(paths), pos, _rng.randf() * TAU, _rng.randf_range(size.x, size.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": SWAMP_TINT})
 
 
 func _build_mountain() -> void:
@@ -2143,9 +2173,12 @@ func _build_coast() -> void:
 		_night_light(coast, Vector3(light.x, 1050.0, light.y), {"flames": true, "energy": 1.6, "light_range": 1500.0, "glow_size": 220.0})
 	# El barco naufragado, varado en la arena, y al lado los restos que se
 	# salvaron: un campamento con cajones y una fogata.
-	var hull := _find_free(Vector2(_shore_x(-1900) - 1100.0, -1900), 1000.0)
+	# Varado en la arena, a lo largo de la orilla.
+	var hull: Vector2 = _settle_box(C + "naufragio.glb", Vector2(_shore_x(-1900) - 900.0, -1900), 0.1, WRECK_SCALE)
 	if hull.is_finite():
-		_prop(coast, C + "naufragio.glb", Vector3(hull.x, -40, hull.y), 0.25, 150.0, 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.78, 0.72), "fade_when_occluding": true}, true)
+		_prop(coast, C + "naufragio.glb", Vector3(hull.x, -40, hull.y), 0.1, WRECK_SCALE, 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.78, 0.72), "fade_when_occluding": true}, true)
+	else:
+		push_warning("No entro el barco naufragado")
 	var wreck := _find_free(Vector2(_shore_x(-2900) - 900.0, -2900), 300.0)
 	if wreck.is_finite():
 		_camp(coast, Vector3(wreck.x, 0, wreck.y), 7)
@@ -2171,7 +2204,7 @@ func _beach(coast: Node3D) -> void:
 		if _rng.randf() < 0.45:
 			_prop(coast, BOULDERS[_rng.randi() % 2], Vector3(x, 0, z), _rng.randf() * TAU, _rng.randf_range(700.0, 1300.0), 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.85, 0.82, 0.78)})
 		else:
-			_prop(coast, DEAD_TREES.pick_random(), Vector3(x, -40, z), _rng.randf() * TAU, _rng.randf_range(80.0, 110.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.76, 0.68)}, false, TRUNK_RADIUS)
+			_prop(coast, _any(DEAD_TREES), Vector3(x, -40, z), _rng.randf() * TAU, _rng.randf_range(80.0, 110.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.76, 0.68)}, false, TRUNK_RADIUS)
 		_strict = false
 		_rejected = false
 
@@ -2242,6 +2275,8 @@ const VILLAGE_SPOTS := [Vector2(-100, 380), Vector2(-780, -120), Vector2(260, 50
 
 func _build_people() -> void:
 	var people := _node("Gente", _root)
+	# Quietos hasta guardar: si no, caminan un cuadro y el mundo no sale igual.
+	people.process_mode = Node.PROCESS_MODE_DISABLED
 	# Dos guardias adentro de cada porton, mirando hacia afuera.
 	for gate in _gates:
 		for side in [-1.0, 1.0]:
