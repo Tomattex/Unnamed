@@ -13,6 +13,7 @@ const InventoryGrid := preload("res://inventory/inventory_grid.gd")
 const EquipmentSlot := preload("res://inventory/equipment_slot.gd")
 const SkillsView := preload("res://inventory/skills_view.gd")
 const ItemDrag := preload("res://inventory/item_drag.gd")
+const WindowStyle := preload("res://ui/window_style.gd")
 ## Ayuda del pie (donde salen tambien los avisos, que la tapan un rato).
 const BAG_HELP := "Arrastrar o clic: mover · Clic der.: usar · Soltar afuera: tirar · W E R T: cinturón"
 const SKILLS_HELP := "La habilidad 1 va en la tecla 1, la 2 en la 2... · Runas: clic der. en la mochila"
@@ -90,40 +91,30 @@ func _build() -> void:
 	box.add_theme_constant_override("separation", 8)
 	margin.add_child(box)
 
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 6)
-	var title := Label.new()
-	title.text = "INVENTARIO"
-	title.theme_type_variation = &"HeaderLabel"
-	header.add_child(title)
+	WindowStyle.setup(self)
+	var header := WindowStyle.header("Inventario", close_inventory, "Cerrar (I)")
 	var spacer := Control.new()
-	spacer.custom_minimum_size.x = 10
-	header.add_child(spacer)
+	spacer.custom_minimum_size.x = 8
+	WindowStyle.add_to_header(header, spacer)
 	var group := ButtonGroup.new()
 	for i in 2:
 		var tab := Button.new()
 		tab.text = ["Mochila", "Habilidades"][i]
+		tab.theme_type_variation = &"TabButton"
 		tab.toggle_mode = true
 		tab.button_group = group
 		tab.focus_mode = Control.FOCUS_NONE
-		tab.custom_minimum_size = Vector2(118, 28)
-		tab.add_theme_font_size_override("font_size", 15)
+		tab.custom_minimum_size = Vector2(124, 30)
 		tab.pressed.connect(show_tab.bind(i))
-		header.add_child(tab)
+		WindowStyle.add_to_header(header, tab)
 		_tab_buttons.append(tab)
-	var fill := Control.new()
-	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(fill)
 	_sort_button = Button.new()
 	_sort_button.text = "Ordenar"
 	_sort_button.tooltip_text = "Junta lo repetido y acomoda la mochila: equipo, gemas y consumibles."
 	_sort_button.focus_mode = Control.FOCUS_NONE
+	_sort_button.custom_minimum_size.y = 30
 	_sort_button.pressed.connect(_on_sort_pressed)
-	var hint := Label.new()
-	hint.text = "   I: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(_sort_button)
-	header.add_child(hint)
+	WindowStyle.add_to_header(header, _sort_button, true)
 	box.add_child(header)
 
 	_bag = VBoxContainer.new()

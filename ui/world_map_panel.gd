@@ -6,6 +6,7 @@ extends Control
 ## mouse) · Arrastrar: mover · Clic derecho: volver al personaje.
 ## Abierto desde un portal (open_travel) sirve para elegir a donde viajar.
 
+const WindowStyle := preload("res://ui/window_style.gd")
 const PORTAL_ICON := preload("res://assets/icons/game-icons/lorc/magic-portal.svg")
 const SKULL_ICON := preload("res://assets/icons/game-icons/lorc/skull-crossed-bones.svg")
 const MAP_TINT := Color(0.93, 0.82, 0.62)
@@ -41,29 +42,26 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	add_child(WindowStyle.backdrop())
 
 	_panel = PanelContainer.new()
+	_panel.theme_type_variation = &"WindowPanel"
 	_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
 		_panel.set("offset_" + side, 40.0 if side in ["left", "top"] else -40.0)
 	add_child(_panel)
+	WindowStyle.setup(self)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	_panel.add_child(box)
-	var header := HBoxContainer.new()
-	_title = Label.new()
-	_title.theme_type_variation = &"HeaderLabel"
-	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var header := WindowStyle.header("", close, "Cerrar (Tab)")
+	_title = WindowStyle.title_of(header)
 	_hint = Label.new()
 	_hint.theme_type_variation = &"DimLabel"
-	header.add_child(_title)
-	header.add_child(_hint)
+	_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	WindowStyle.add_to_header(header, _hint, true)
 	box.add_child(header)
+	box.add_child(WindowStyle.rule())
 
 	_view = Control.new()
 	_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -102,9 +100,9 @@ func _show() -> void:
 	if player:
 		_center = Vector2(player.global_position.x, player.global_position.z)
 	visible = true
-	_title.text = "VIAJAR POR LOS PORTALES" if not _travel_from.is_empty() else "MAPA DEL MUNDO"
+	_title.text = "Viajar por los portales" if not _travel_from.is_empty() else "Mapa del mundo"
 	_hint.text = ("Clic en un portal: viajar · " if not _travel_from.is_empty() else "") \
-			+ "Rueda: zoom · Arrastrar: mover · Clic derecho: centrar · Tab: cerrar"
+			+ "Rueda: zoom · Arrastrar: mover · Clic derecho: centrar"
 	world_map.get_map_texture()
 	sfx.play("page")
 	_update_pause()

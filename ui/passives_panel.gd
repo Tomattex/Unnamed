@@ -39,7 +39,8 @@ func _ready() -> void:
 	_known.add_theme_constant_override("separation", 6)
 	lists.add_child(_known)
 	_choices_title = Label.new()
-	_choices_title.add_theme_color_override("font_color", GOLD)
+	_choices_title.theme_type_variation = &"HeaderLabel"
+	_choices_title.add_theme_font_size_override("font_size", 16)
 	lists.add_child(_choices_title)
 	_choices = VBoxContainer.new()
 	_choices.add_theme_constant_override("separation", 6)

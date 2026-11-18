@@ -27,7 +27,10 @@ static func build(item: Itemdata, quantity: int = 1, hint: String = "", compare:
 	var title: String = item.get_display_name()
 	if quantity > 1:
 		title += " x%d" % quantity
-	_add(box, title, item.get_rarity_color(), 18)
+	# El nombre con la fuente de los titulos, como las ventanas.
+	var name_label: Label = _add(box, title, item.get_rarity_color(), 19)
+	name_label.theme_type_variation = &"TooltipTitle"
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_add(box, item.get_type_line(), DIM_COLOR, 13)
 	if item.is_rune():
 		_add_rune_info(box, item)

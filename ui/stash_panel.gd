@@ -5,6 +5,7 @@ extends PanelContainer
 ## Lo guardado aca queda en la partida aunque se vacie la mochila.
 
 const InventoryGrid := preload("res://inventory/inventory_grid.gd")
+const WindowStyle := preload("res://ui/window_style.gd")
 
 var stash: Node3D = null
 
@@ -24,17 +25,9 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 10)
 	margin.add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "BAÚL"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var hint := Label.new()
-	hint.text = "Esc: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(title)
-	header.add_child(hint)
-	box.add_child(header)
+	WindowStyle.setup(self)
+	box.add_child(WindowStyle.header("Baúl", close))
+	box.add_child(WindowStyle.rule())
 
 	var grid := InventoryGrid.new()
 	grid.grid = inventory_data.stash
@@ -81,6 +74,8 @@ func open_for(new_stash: Node3D) -> void:
 	var inventory: Control = get_tree().get_first_node_in_group("inventory_panel")
 	if inventory and not inventory.visible:
 		inventory.open_inventory()
+	if inventory:
+		inventory.show_tab(0)
 	_update_pause()
 
 

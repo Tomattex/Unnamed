@@ -4,6 +4,7 @@ extends Control
 ## izquierda las runas de otras clases que hay en la mochila, a la derecha
 ## las habilidades de la clase; se elige una de cada lado y se cambia por oro.
 
+const WindowStyle := preload("res://ui/window_style.gd")
 const ICON_SIZE := Vector2(40, 40)
 const GOLD := Color(0.95, 0.8, 0.48)
 const DIM := Color(0.6, 0.55, 0.46)
@@ -26,33 +27,22 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	add_child(WindowStyle.backdrop())
 
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = &"WindowPanel"
 	panel.custom_minimum_size = Vector2(760, 480)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(panel)
+	WindowStyle.setup(self)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "RUNISTA"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var hint := Label.new()
-	hint.text = "Esc: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(hint)
-	box.add_child(header)
+	box.add_child(WindowStyle.header("Runista", close))
+	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
 	info.text = "Las runas de otras clases no te sirven, pero a mí sí: te las cambio por una de las tuyas."
@@ -97,7 +87,8 @@ func _column(parent: HBoxContainer, title_text: String) -> VBoxContainer:
 	column.add_theme_constant_override("separation", 4)
 	var title := Label.new()
 	title.text = title_text
-	title.add_theme_color_override("font_color", GOLD)
+	title.theme_type_variation = &"HeaderLabel"
+	title.add_theme_font_size_override("font_size", 18)
 	column.add_child(title)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -180,6 +171,7 @@ func _refresh() -> void:
 # Boton con icono, nombre y una linea chica (seleccionable dentro del grupo).
 func _choice(parent: VBoxContainer, group: ButtonGroup, icon: Texture2D, title: String, detail: String) -> Button:
 	var button := Button.new()
+	button.theme_type_variation = &"ListButton"
 	button.toggle_mode = true
 	button.button_group = group
 	button.custom_minimum_size = Vector2(0, 50)

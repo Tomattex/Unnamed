@@ -4,6 +4,7 @@ extends PanelContainer
 ## se ejecutan una detras de otra con la tecla 6.
 
 const ICON_SIZE: int = 24
+const WindowStyle := preload("res://ui/window_style.gd")
 
 var _pickers: Array[OptionButton] = []
 var _cooldown_label: Label
@@ -26,17 +27,9 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "COMBO"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var hint := Label.new()
-	hint.text = "K: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(title)
-	header.add_child(hint)
-	box.add_child(header)
+	WindowStyle.setup(self)
+	box.add_child(WindowStyle.header("Combo", close, "Cerrar (K)"))
+	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
 	info.text = "Elegí hasta 3 habilidades. Con la tecla 6 se usan una detrás de otra. El combo tiene su propia recarga y no gasta la de cada habilidad."
@@ -69,6 +62,7 @@ func _ready() -> void:
 
 	var clear := Button.new()
 	clear.text = "Limpiar combo"
+	clear.custom_minimum_size.y = 34
 	clear.pressed.connect(func() -> void:
 		skill_book.set_combo([])
 		sfx.play("click")

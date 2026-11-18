@@ -18,23 +18,6 @@ script = ExtResource("1_char")
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Header" type="HBoxContainer" parent="VBox"]
-layout_mode = 2
-
-[node name="Title" type="Label" parent="VBox/Header"]
-layout_mode = 2
-theme_type_variation = &"HeaderLabel"
-text = "PERSONAJE"
-
-[node name="Spacer" type="Control" parent="VBox/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Hint" type="Label" parent="VBox/Header"]
-layout_mode = 2
-theme_type_variation = &"DimLabel"
-text = "C: cerrar"
-
 [node name="LevelLabel" type="Label" parent="VBox"]
 unique_name_in_owner = true
 layout_mode = 2

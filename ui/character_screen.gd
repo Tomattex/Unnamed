@@ -6,9 +6,12 @@ extends PanelContainer
 ## Pasivas: las habilidades pasivas (ui/passives_panel.gd).
 
 const PassivesView := preload("res://ui/passives_panel.gd")
+const WindowStyle := preload("res://ui/window_style.gd")
 ## Ancho de la hoja (las pasivas necesitan un poco mas que los atributos).
 const WIDTH: float = 380.0
 const PENDING_COLOR := Color(0.55, 0.9, 0.45)
+## Colores de la pestaña que se pintan de verde cuando hay algo pendiente.
+const TAB_COLORS := ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]
 
 const ATTRIBUTES := {
 	"fuerza": ["Fuerza", "+2% de daño por punto."],
@@ -45,6 +48,19 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	add_to_group("pause_panels")
+	# Titulo con la clase y el nivel al lado (asi la hoja entra en pantallas bajas).
+	WindowStyle.setup(self)
+	var vbox: VBoxContainer = level_label.get_parent()
+	var header := WindowStyle.header("Personaje", close, "Cerrar (C)")
+	vbox.add_child(header)
+	vbox.move_child(header, 0)
+	vbox.remove_child(level_label)
+	level_label.add_theme_font_size_override("font_size", 16)
+	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	WindowStyle.add_to_header(header, level_label, true)
+	var rule := WindowStyle.rule()
+	vbox.add_child(rule)
+	vbox.move_child(rule, 1)
 
 	for key in ATTRIBUTES:
 		var row := HBoxContainer.new()
@@ -111,9 +127,11 @@ func _build_tabs() -> void:
 	var group := ButtonGroup.new()
 	for i in 2:
 		var button := Button.new()
+		button.theme_type_variation = &"TabButton"
 		button.toggle_mode = true
 		button.button_group = group
 		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size.y = 32
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(show_tab.bind(i))
 		tabs.add_child(button)
@@ -195,10 +213,11 @@ func refresh() -> void:
 	_tab_buttons[1].text = "Pasivas (!)" if pending else "Pasivas"
 	for i in 2:
 		var highlight: bool = (points > 0) if i == 0 else pending
-		if highlight:
-			_tab_buttons[i].add_theme_color_override("font_color", PENDING_COLOR)
-		else:
-			_tab_buttons[i].remove_theme_color_override("font_color")
+		for color_name in TAB_COLORS:
+			if highlight:
+				_tab_buttons[i].add_theme_color_override(color_name, PENDING_COLOR)
+			else:
+				_tab_buttons[i].remove_theme_color_override(color_name)
 	for key in ATTRIBUTES:
 		var bonus: int = roundi(player_stats.get_equipment_bonus(key))
 		_value_labels[key].text = str(player_stats.get_attribute(key))

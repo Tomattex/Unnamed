@@ -410,13 +410,11 @@ func _page() -> VBoxContainer:
 
 
 func _header(text: String) -> Label:
+	# Mismo titulo que las ventanas del juego (ui/window_style.gd).
 	var label := Label.new()
-	label.text = text.to_upper()
-	label.add_theme_font_override("font", _title_font)
-	label.add_theme_font_size_override("font_size", 24)
-	label.add_theme_color_override("font_color", GOLD)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.text = text
+	label.theme_type_variation = &"WindowTitle"
+	label.add_theme_font_size_override("font_size", 28)
 	return label
 
 

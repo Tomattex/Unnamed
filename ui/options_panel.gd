@@ -46,6 +46,7 @@ func _new_tab(tab_row: HBoxContainer, group: ButtonGroup, title: String) -> VBox
 	var index: int = _tabs.size()
 	var button := Button.new()
 	button.text = title
+	button.theme_type_variation = &"TabButton"
 	button.toggle_mode = true
 	button.button_group = group
 	button.custom_minimum_size = Vector2(120, 34)
@@ -67,8 +68,6 @@ func _show_tab(index: int) -> void:
 	for i in _tabs.size():
 		_tabs[i].visible = i == index
 		_tab_buttons[i].set_pressed_no_signal(i == index)
-		# El tema dibuja igual el boton apretado: las otras se oscurecen.
-		_tab_buttons[i].modulate = Color.WHITE if i == index else Color(0.55, 0.55, 0.55)
 
 
 func _add_volume_row(box: VBoxContainer, bus_name: String, title: String) -> void:

@@ -4,6 +4,7 @@ extends Control
 ## pasivas de su rama, con el nivel que tiene el personaje, lo que da el
 ## siguiente y el precio. Las que todavia no sabe se eligen en Pasivas (P).
 
+const WindowStyle := preload("res://ui/window_style.gd")
 const ICON_SIZE := Vector2(44, 44)
 const GOLD := Color(0.95, 0.8, 0.48)
 const TEXT := Color(0.88, 0.82, 0.68)
@@ -23,32 +24,24 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	add_child(WindowStyle.backdrop())
 
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = &"WindowPanel"
 	panel.custom_minimum_size = Vector2(700, 470)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(panel)
+	WindowStyle.setup(self)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 
-	var header := HBoxContainer.new()
-	_title = Label.new()
-	_title.theme_type_variation = &"HeaderLabel"
-	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(_title)
-	var hint := Label.new()
-	hint.text = "Esc: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(hint)
+	var header := WindowStyle.header("", close)
+	_title = WindowStyle.title_of(header)
 	box.add_child(header)
+	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
 	info.text = "Por oro te entreno lo que ya sabés. Ninguna pasiva puede pasar tu nivel."
@@ -90,7 +83,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open_for(new_trainer: Node3D) -> void:
 	trainer = new_trainer
-	_title.text = trainer.display_name.to_upper()
+	_title.text = trainer.display_name
 	_message.text = ""
 	visible = true
 	sfx.play("page")

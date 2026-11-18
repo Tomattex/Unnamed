@@ -6,6 +6,7 @@ extends PanelContainer
 ## cerrar, lo que quedo en el yunque vuelve al inventario.
 
 const AnvilSlot := preload("res://ui/anvil_slot.gd")
+const WindowStyle := preload("res://ui/window_style.gd")
 const SOCKET_SIZE: float = 54.0
 const EMPTY_COLOR := Color(0.75, 0.7, 0.6, 0.55)
 const LOCKED_COLOR := Color(0.3, 0.28, 0.25, 0.9)
@@ -36,17 +37,9 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "HERRERO"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var hint := Label.new()
-	hint.text = "Esc: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(title)
-	header.add_child(hint)
-	box.add_child(header)
+	WindowStyle.setup(self)
+	box.add_child(WindowStyle.header("Herrero", close))
+	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
 	info.text = "Poné en el yunque un arma, un escudo o una ballesta."
@@ -128,6 +121,8 @@ func open_for(new_smith: Node3D) -> void:
 	var inventory: Control = get_tree().get_first_node_in_group("inventory_panel")
 	if inventory and not inventory.visible:
 		inventory.open_inventory()
+	if inventory:
+		inventory.show_tab(0)
 	_update_pause()
 
 

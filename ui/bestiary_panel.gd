@@ -7,6 +7,7 @@ extends Control
 ## Abajo, las regiones liberadas en la dificultad actual (un campeon
 ## derrotado en cada una completa la dificultad). Pausa el juego.
 
+const WindowStyle := preload("res://ui/window_style.gd")
 const GOLD := Color(0.95, 0.8, 0.48)
 const TEXT := Color(0.88, 0.82, 0.68)
 const DIM := Color(0.6, 0.55, 0.46)
@@ -35,32 +36,27 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	add_child(WindowStyle.backdrop())
 
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = &"WindowPanel"
 	panel.custom_minimum_size = Vector2(880, 500)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(panel)
+	WindowStyle.setup(self)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	panel.add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "BESTIARIO"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
+	var header := WindowStyle.header("Bestiario", close, "Cerrar (B)")
 	_count_label = Label.new()
 	_count_label.theme_type_variation = &"DimLabel"
-	header.add_child(_count_label)
+	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	WindowStyle.add_to_header(header, _count_label, true)
 	box.add_child(header)
+	box.add_child(WindowStyle.rule())
 
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 16)
@@ -97,8 +93,8 @@ func _ready() -> void:
 	info.add_theme_constant_override("separation", 6)
 	body.add_child(info)
 	_name_label = Label.new()
+	_name_label.theme_type_variation = &"HeaderLabel"
 	_name_label.add_theme_font_size_override("font_size", 26)
-	_name_label.add_theme_color_override("font_color", GOLD)
 	info.add_child(_name_label)
 	_details = RichTextLabel.new()
 	_details.bbcode_enabled = true
@@ -116,7 +112,7 @@ func _ready() -> void:
 	box.add_child(_regions_label)
 
 	var hint := Label.new()
-	hint.text = "Clic en un enemigo para verlo · B o Esc: cerrar"
+	hint.text = "Clic en un enemigo para verlo"
 	hint.theme_type_variation = &"DimLabel"
 	hint.add_theme_font_size_override("font_size", 13)
 	box.add_child(hint)
@@ -168,6 +164,7 @@ func _refresh() -> void:
 		if not entry.is_empty():
 			known += 1
 		var button := Button.new()
+		button.theme_type_variation = &"ListButton"
 		button.toggle_mode = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.text = ("%s  ·  %d" % [data.name, entry.kills]) if not entry.is_empty() else "???"

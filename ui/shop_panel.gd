@@ -4,6 +4,7 @@ extends PanelContainer
 ## de la tienda lo compra, clic derecho en el inventario vende.
 
 const ShopSlot := preload("res://ui/shop_slot.gd")
+const WindowStyle := preload("res://ui/window_style.gd")
 
 var merchant: Node3D = null
 var _grid: GridContainer
@@ -29,17 +30,9 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "COMERCIANTE"
-	title.theme_type_variation = &"HeaderLabel"
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var hint := Label.new()
-	hint.text = "Esc: cerrar"
-	hint.theme_type_variation = &"DimLabel"
-	header.add_child(title)
-	header.add_child(hint)
-	box.add_child(header)
+	WindowStyle.setup(self)
+	box.add_child(WindowStyle.header("Comerciante", close))
+	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
 	info.text = "Clic en un item para comprarlo.\nClic derecho en tu inventario para vender."
@@ -104,6 +97,9 @@ func open_for(new_merchant: Node3D) -> void:
 	var inventory: Control = get_tree().get_first_node_in_group("inventory_panel")
 	if inventory and not inventory.visible:
 		inventory.open_inventory()
+	# Para vender hace falta ver la mochila, no la lista de habilidades.
+	if inventory:
+		inventory.show_tab(0)
 	_update_pause()
 
 
