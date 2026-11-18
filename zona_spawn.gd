@@ -18,8 +18,6 @@ const SPAWN_MIN_DISTANCE := 1600.0
 const SPAWN_MAX_DISTANCE := 2900.0
 ## Intentos por tanda para encontrar un lugar valido.
 const SPAWN_TRIES := 14
-## Cuantos mas enemigos que max_enemies puede haber cerca (todas las zonas).
-const DENSITY := 1.25
 ## Con menos de esta parte del cupo alrededor, la proxima tanda sale a los
 ## REFILL_INTERVAL segundos en vez de esperar spawn_interval.
 const REFILL_FRACTION := 0.5
@@ -274,7 +272,7 @@ func _in_charge() -> bool:
 
 ## Cuantos enemigos puede haber cerca del jugador: menos entre regiones.
 func _limit(night: bool) -> int:
-	var limit: float = max_enemies * DENSITY * (1.5 if night else 1.0)
+	var limit: float = max_enemies * (1.5 if night else 1.0)
 	if not _contains(_player.global_position, 0.0):
 		limit *= WILD_DENSITY
 	return maxi(roundi(limit), 2)
