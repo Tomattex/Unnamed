@@ -1957,14 +1957,17 @@ func _build_sea(parent: Node3D) -> PackedVector2Array:
 	material.set_shader_parameter("deep_color", Color(0.05, 0.18, 0.27))
 	material.set_shader_parameter("shallow_color", Color(0.14, 0.36, 0.42))
 	material.set_shader_parameter("foam_both_sides", false)
-	material.set_shader_parameter("foam_width", 0.025)
+	material.set_shader_parameter("foam_width", 0.008)
 	material.set_shader_parameter("wave_strength", 1.6)
 	material.set_shader_parameter("flow_speed", 0.12)
+	# La franja mide unas 24000 de ancho: el borde suave va en UV.x chiquito.
+	material.set_shader_parameter("edge_soft", 0.004)
+	# Puntos cada 200 (cada 400 la orilla se veia en escalones).
 	var shore := PackedVector2Array()
 	var z: float = -HALF - 2000.0
 	while z <= HALF + 2000.0:
 		shore.append(Vector2(_shore_x(z), z))
-		z += 400.0
+		z += 200.0
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var far: float = HALF + 6000.0
@@ -2049,22 +2052,32 @@ func _bridge(parent: Node3D, center: Vector2, dir: Vector2, length: float) -> vo
 	wood.albedo_color = Color(0.9, 0.82, 0.74)
 	wood.roughness = 0.9
 	wood.uv1_scale = Vector3(0.6, 0.6, 0.6)
+	# Los tablones van todos en una sola malla armada a mano: un MultiMesh
+	# armado en headless se guardaba sin las posiciones y el puente quedaba
+	# sin piso (se caminaba sobre el agua entre las barandas).
 	var plank := BoxMesh.new()
-	plank.size = Vector3(BRIDGE_WIDTH, 10.0, 54.0)
-	plank.material = wood
-	var planks := MultiMesh.new()
-	planks.transform_format = MultiMesh.TRANSFORM_3D
-	planks.mesh = plank
+	plank.size = Vector3(BRIDGE_WIDTH, 14.0, 54.0)
+	var arrays: Array = plank.get_mesh_arrays()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var count: int = int(length / 62.0)
-	planks.instance_count = count
 	for i in count:
 		var z: float = -length / 2.0 + 31.0 + i * 62.0
 		var t: float = z / (length / 2.0)
 		var rot := Basis(Vector3.UP, _rng.randf_range(-0.03, 0.03))
-		planks.set_instance_transform(i, Transform3D(rot, Vector3(_rng.randf_range(-8.0, 8.0), 6.0 + 8.0 * (1.0 - t * t), z)))
-	var deck := MultiMeshInstance3D.new()
+		var placed := Transform3D(rot, Vector3(_rng.randf_range(-8.0, 8.0), 8.0 + 8.0 * (1.0 - t * t), z))
+		for index in indices:
+			tool.set_normal(rot * normals[index])
+			tool.set_uv(uvs[index] + Vector2(0.0, float(i) * 0.37))
+			tool.add_vertex(placed * vertices[index])
+	tool.set_material(wood)
+	var deck := MeshInstance3D.new()
 	deck.name = "Tablones"
-	deck.multimesh = planks
+	deck.mesh = tool.commit()
 	deck.layers = 1 | PROP_SCRIPT.MAP_LAYER
 	bridge.add_child(deck)
 	# Postes y barandas a los dos costados.
