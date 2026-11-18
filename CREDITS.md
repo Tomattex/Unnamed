@@ -70,7 +70,7 @@ Sabio "book-cover" de Lorc y la Runista "rune-stone" de Lorc.
 Las gemas (`item/gems/`) no usan arte de afuera: su talla y sus materiales los
 genera `item/gems/build_gems.gd`.
 
-## Personajes y armas (CC BY-SA 3.0)
+## Personajes, armas y mundo de 0 A.D. (CC BY-SA 3.0)
 
 Los personajes (las tres clases del jugador, el comerciante, el herrero, los
 bandidos y el zombi), sus animaciones y los modelos de las armas y escudos
@@ -105,6 +105,16 @@ Están en `assets/characters/oad/` junto con la licencia original
   igual que los personajes. El jefe bandido, el nigromante y el chamán
   esqueleto usan cuerpos y accesorios de 0 A.D. (capucha, báculo) con otros
   colores (`enemies/models/model_dress.gd`).
+- Mundo: los árboles (robles, olmos, abedules, abetos, sauces y árboles
+  secos), los arbustos y helechos (`assets/nature/oad/`) y las casas celtas,
+  el granero, el almacén, los carros, el pozo, los puestos, la mesa, la leña,
+  el cerco de piedra, los menhires, el barco naufragado y los esqueletos del
+  desierto (`assets/props/oad/`), cada carpeta con su `LICENSE.txt`, son
+  modelos de 0 A.D. (`art/meshes/gaia/`, `art/meshes/structural/` y
+  `art/meshes/props/`) con sus texturas de `art/textures/skins/`. Cambios:
+  pasados de COLLADA a glTF, cada pieza armada con sus partes (tronco y copa,
+  casa con puerta y detalles) y nombres en español; algunas copas usan otra
+  textura del mismo árbol (otoño, seco, nevado).
 - **Comparte igual:** estos archivos y cualquier cambio que se les haga siguen
   bajo CC BY-SA 3.0. El resto del juego (código y demás arte) no cambia de
   licencia por incluirlos.
@@ -140,10 +150,7 @@ lo dejamos anotado.
 |---|---|---|
 | Rocas (Rock 07, Rock 09) | Jenelle van Heerden | https://polyhaven.com/a/rock_07 · https://polyhaven.com/a/rock_09 |
 | Rocas con musgo (Rock Moss Set 01) | Kless Gyzen | https://polyhaven.com/a/rock_moss_set_01 |
-| Helechos (Fern 02) | Rob Tuytel, Rico Cilliers | https://polyhaven.com/a/fern_02 |
-| Arbustos (Shrub 02) | Rico Cilliers | https://polyhaven.com/a/shrub_02 |
 | Tocón (Tree Stump 01) | Rob Tuytel | https://polyhaven.com/a/tree_stump_01 |
-| Árboles, pinos, árboles secos y retorcidos ("Stylized Nature MegaKit") | Quaternius | https://quaternius.com · modelos bajados de https://poly.pizza (CC0 1.0) |
 
 ### Piezas (`assets/props/`)
 
@@ -158,9 +165,11 @@ lo dejamos anotado.
 | Estatua (Gothic Statue) | Benny Weimer | https://polyhaven.com/a/gothic_statue |
 | Cofres y baúl (Treasure Chest) | Rico Cilliers | https://polyhaven.com/a/treasure_chest |
 | Lápidas, criptas, rejas, faroles y braseros (Graveyard Kit) | Kenney | https://kenney.nl/assets/graveyard-kit (licencia en `assets/props/graveyard/License.txt`) |
-| Casas, pozo, carro y puesto ("Medieval Village") | Quaternius | https://quaternius.com · modelos bajados de https://poly.pizza (CC0 1.0) |
 
-Nota sobre Quaternius: los modelos se bajaron de poly.pizza, donde cada uno
+Los árboles, arbustos, casas y demás piezas de la aldea son de 0 A.D. (ver
+arriba, CC BY-SA 3.0).
+
+Nota sobre Quaternius (solo quedan sus animales): los modelos se bajaron de poly.pizza, donde cada uno
 figura como CC0 1.0 (igual que la página del pack en quaternius.com). Su sitio
 publicó en 2026 una licencia propia para descargas nuevas que no permite
 redistribuir los modelos sueltos como pack; las copias que ya salieron como CC0

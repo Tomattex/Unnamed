@@ -232,15 +232,88 @@ static func _roll_rarity(magic_find: float = 0.0) -> int:
 	return 0
 
 
-## Deja un item en el piso. Con "pop" salta un poco antes de caer.
+## Deja un item en el piso cerca de position (en un lugar libre, ver
+## drop_spot). Con "pop" salta un poco antes de caer.
 static func spawn_pickup(parent: Node, position: Vector3, item: Itemdata, quantity: int = 1, pop: bool = true) -> Node3D:
 	var pickup: Node3D = load(PICKUP_SCENE_PATH).instantiate()
 	pickup.item_data = item
 	pickup.quantity = quantity
+	var spot: Vector3 = drop_spot(parent, position)
 	parent.add_child(pickup)
-	var offset := Vector3(randf_range(-120.0, 120.0), 0.0, randf_range(-120.0, 120.0))
-	var ground: Vector3 = Vector3(position.x, 5.0, position.z) + offset
-	pickup.global_position = ground
+	pickup.global_position = Vector3(spot.x, 5.0, spot.z)
 	if pop:
 		pickup.pop_from(Vector3(position.x, 5.0, position.z))
 	return pickup
+
+
+## Donde cae lo que se suelta (un item, el botin de un cofre o de un
+## enemigo): a 60-170 unidades de origin, alrededor.
+const DROP_MIN: float = 60.0
+const DROP_MAX: float = 170.0
+const DROP_TRIES: int = 24
+## Lo que mide un item tirado (para que no quede adentro de nada).
+const DROP_ITEM_RADIUS: float = 32.0
+## Mas lejos que esto del piso caminable es agua, un rincon cerrado o
+## adentro de algo (la navegacion deja 60 de margen alrededor de lo solido).
+const DROP_NAV_TOLERANCE: float = 75.0
+## Separacion entre items tirados (si se puede).
+const DROP_SPACING: float = 55.0
+
+
+## Un punto del piso cerca de origin donde un item no queda adentro de una
+## roca, un barril, un muro o el agua, ni del otro lado de una pared. Prueba
+## alrededor, cada vez un poco mas lejos; si no encuentra ninguno, el punto
+## caminable mas cercano a origin.
+static func drop_spot(source: Node, origin: Vector3) -> Vector3:
+	var flat_origin := Vector3(origin.x, 0.0, origin.z)
+	if source == null or not source.is_inside_tree():
+		return flat_origin
+	var world: World3D = source.get_viewport().find_world_3d()
+	var space: PhysicsDirectSpaceState3D = world.direct_space_state
+	var map: RID = world.navigation_map
+	var nav_ready: bool = NavigationServer3D.map_get_iteration_id(map) > 0
+	var shape := SphereShape3D.new()
+	shape.radius = DROP_ITEM_RADIUS
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = 1
+	var others: Array[Node] = source.get_tree().get_nodes_in_group("pickups")
+	for attempt in DROP_TRIES:
+		var reach: float = lerpf(DROP_MIN, DROP_MAX, minf(float(attempt) / (DROP_TRIES * 0.6), 1.0))
+		var angle: float = randf() * TAU
+		var candidate: Vector3 = flat_origin + Vector3(cos(angle), 0.0, sin(angle)) * reach * randf_range(0.75, 1.0)
+		if nav_ready:
+			var closest: Vector3 = NavigationServer3D.map_get_closest_point(map, candidate)
+			if Vector2(closest.x - candidate.x, closest.z - candidate.z).length() > DROP_NAV_TOLERANCE:
+				continue
+		# Algo solido donde caeria (la esfera va arriba del piso: no lo toca).
+		query.transform = Transform3D(Basis.IDENTITY, candidate + Vector3.UP * (DROP_ITEM_RADIUS + 12.0))
+		if _hits_static(space.intersect_shape(query, 8)):
+			continue
+		# Una pared o una roca entre el origen y el lugar.
+		var ray := PhysicsRayQueryParameters3D.create(flat_origin + Vector3.UP * 60.0, candidate + Vector3.UP * 60.0, 1)
+		var hit: Dictionary = space.intersect_ray(ray)
+		if not hit.is_empty() and hit.collider is StaticBody3D:
+			continue
+		# Los primeros intentos, ademas, lejos de los items que ya hay.
+		if attempt < DROP_TRIES / 2 and _crowded(candidate, others):
+			continue
+		return candidate
+	if nav_ready:
+		var closest: Vector3 = NavigationServer3D.map_get_closest_point(map, flat_origin)
+		return Vector3(closest.x, 0.0, closest.z)
+	return flat_origin
+
+
+static func _hits_static(results: Array[Dictionary]) -> bool:
+	for result in results:
+		if result.collider is StaticBody3D:
+			return true
+	return false
+
+
+static func _crowded(point: Vector3, pickups: Array[Node]) -> bool:
+	for pickup in pickups:
+		if is_instance_valid(pickup) and Vector2(pickup.global_position.x - point.x, pickup.global_position.z - point.z).length() < DROP_SPACING:
+			return true
+	return false

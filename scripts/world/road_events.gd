@@ -15,7 +15,7 @@ const ENEMY_SCENE := preload("res://enemi.tscn")
 const WALKER := preload("res://scripts/npc/walker.gd")
 const BANDIT := preload("res://enemies/types/bandido.tres")
 const ARCHER := preload("res://enemies/types/bandido_arquero.tres")
-const CART := "res://assets/props/village/qt_cart/qt_cart.glb"
+const CART := "res://assets/props/oad/carro_roto.glb"
 const BLESSING_ICON := "res://assets/icons/game-icons/lorc/magic-swirl.svg"
 
 enum Kind { TRAVELER, CART_WRECK, PILGRIM }
@@ -105,9 +105,9 @@ func start(kind: int, spot: Vector3) -> void:
 				_spawn_enemy(ARCHER if i == count - 1 else BANDIT, spot, i, count, 330.0)
 		Kind.CART_WRECK:
 			_prop = load(CART).instantiate()
-			_prop.scale = Vector3.ONE * 380.0
-			_prop.rotation = Vector3(0.0, randf() * TAU, 1.35)
-			_prop.position = spot + Vector3.UP * 60.0
+			_prop.scale = Vector3.ONE * 320.0
+			_prop.rotation = Vector3(0.0, randf() * TAU, 0.0)
+			_prop.position = spot
 			add_child(_prop)
 			var types: Array = _zone_types(spot)
 			var count: int = randi_range(3, 4)

@@ -11,6 +11,8 @@ const STONE := "res://assets/props/graveyard/pillar-obelisk.glb"
 const DISCOVER_RADIUS: float = 520.0
 const RING_RADIUS: float = 270.0
 const STONE_COUNT: int = 6
+## Ancho del obelisco en sus unidades (la colision de cada piedra).
+const STONE_WIDTH: float = 0.35
 const COLOR := Color(0.45, 0.75, 1.0)
 const DORMANT_COLOR := Color(0.28, 0.32, 0.4)
 
@@ -42,10 +44,19 @@ func _ready() -> void:
 		stone.set_script(PROP_SCRIPT)
 		stone.style = PROP_SCRIPT.Style.STONE
 		stone.tint = Color(0.75, 0.76, 0.8)
-		stone.transform = Transform3D(Basis(Vector3.UP, -angle + PI * 0.5).scaled(Vector3.ONE * (380.0 + 40.0 * (i % 2))),
+		var stone_scale: float = 380.0 + 40.0 * (i % 2)
+		stone.transform = Transform3D(Basis(Vector3.UP, -angle + PI * 0.5).scaled(Vector3.ONE * stone_scale),
 				Vector3(cos(angle), 0.0, sin(angle)) * RING_RADIUS)
 		stone.add_child(load(STONE).instantiate())
 		add_child(stone)
+		# Cada piedra es solida (antes se las atravesaba).
+		var stone_shape := CollisionShape3D.new()
+		var pillar := CylinderShape3D.new()
+		pillar.radius = STONE_WIDTH * stone_scale * 0.45
+		pillar.height = stone_scale
+		stone_shape.shape = pillar
+		stone_shape.position = stone.position + Vector3.UP * pillar.height / 2.0
+		add_child(stone_shape)
 
 	_sigil_material = StandardMaterial3D.new()
 	_sigil_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

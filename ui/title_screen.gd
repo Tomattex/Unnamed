@@ -376,7 +376,7 @@ func _credits_text() -> String:
 		"[color=#%s][b]Interfaz[/b][/color]" % gold,
 		"RPG GUI construction kit — Matjaž Lamut (CC-BY 3.0)",
 		"",
-		"[color=#%s][b]Personajes y armas[/b][/color]" % gold,
+		"[color=#%s][b]Personajes, armas, árboles y casas[/b][/color]" % gold,
 		"0 A.D. — Wildfire Games, wildfiregames.com (CC BY-SA 3.0, creativecommons.org/licenses/by-sa/3.0)",
 		"",
 		"[color=#%s][b]Íconos[/b][/color]" % gold,
