@@ -3,6 +3,8 @@ extends MeshInstance3D
 ## Estela del arma mientras el jugador pega cuerpo a cuerpo: una cinta entre
 ## la mitad y la punta de la hoja que se va borrando. Va como hijo del modelo
 ## del jugador (player_1.gd) pero se dibuja en coordenadas del mundo.
+## Las armas encantadas la tiñen del color de su elemento o de su rareza
+## (EnchantFx.trail_color).
 
 ## Segundos que dura cada tramo de la estela.
 const LIFETIME: float = 0.16
@@ -10,6 +12,7 @@ const COLOR := Color(1.0, 0.95, 0.85, 0.28)
 ## Desde que parte de la hoja arranca la estela (0 = mango, 1 = punta).
 const BLADE_START: float = 0.5
 
+var color: Color = COLOR
 var _samples: Array = []
 var _strip := ImmediateMesh.new()
 var _weapon: Node = null
@@ -30,6 +33,13 @@ func _ready() -> void:
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.vertex_color_use_as_albedo = true
 	material_override = material
+	inventory_data.equipment_changed.connect(func(_index: int) -> void: _refresh_color())
+	_refresh_color()
+
+
+func _refresh_color() -> void:
+	var tint: Variant = EnchantFx.trail_color(inventory_data.get_equipped(inventory_data.MELEE_EQUIP))
+	color = tint if tint != null else COLOR
 
 
 func _process(_delta: float) -> void:
@@ -46,9 +56,9 @@ func _process(_delta: float) -> void:
 	_strip.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for sample in _samples:
 		var fade: float = 1.0 - (now - sample[2]) / LIFETIME
-		_strip.surface_set_color(Color(COLOR, COLOR.a * fade * 0.3))
+		_strip.surface_set_color(Color(color, color.a * fade * 0.3))
 		_strip.surface_add_vertex(sample[0])
-		_strip.surface_set_color(Color(COLOR, COLOR.a * fade))
+		_strip.surface_set_color(Color(color, color.a * fade))
 		_strip.surface_add_vertex(sample[1])
 	_strip.surface_end()
 
@@ -71,10 +81,11 @@ func _blade() -> Array:
 	return [t * Vector3(0.0, _length * BLADE_START, 0.0), t * Vector3(0.0, _length, 0.0)]
 
 
+# Solo las mallas del modelo del arma (no los brillos que van al lado).
 func _weapon_length(hand: Node3D) -> float:
 	var to_hand: Transform3D = hand.global_transform.affine_inverse()
 	var tip: float = 0.0
-	for mesh in hand.find_children("*", "MeshInstance3D", true, false):
+	for mesh in _weapon.find_children("*", "MeshInstance3D", true, false):
 		var box: AABB = to_hand * mesh.global_transform * (mesh as MeshInstance3D).get_aabb()
 		tip = maxf(tip, box.end.y)
 	return tip

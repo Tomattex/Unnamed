@@ -45,6 +45,7 @@ func _ready() -> void:
 	elif item_data.texture:
 		_setup_sprite()
 	_setup_label()
+	_setup_glow()
 	_bob_time = randf() * TAU
 
 
@@ -104,6 +105,28 @@ func _setup_label() -> void:
 		name_label.modulate = Color(1.0, 0.85, 0.35)
 
 
+## Los items buenos brillan en el piso: el modelo con el brillo de su rareza
+## (EnchantFx), una mancha de luz alrededor y, de raro para arriba, un haz
+## que se ve de lejos.
+func _setup_glow() -> void:
+	if not item_data.is_equipment():
+		return
+	if model_holder.visible and model_holder.get_child_count() > 0:
+		EnchantFx.dress(model_holder.get_child(0), item_data)
+	var tier: int = EnchantFx.tier_of(item_data)
+	if tier == EnchantFx.Tier.NONE:
+		return
+	var color: Color = EnchantFx.glow_color(item_data)
+	var glow: MeshInstance3D = EnchantFx.ground_glow(Color(color, 0.3 + 0.12 * tier), 260.0 + 70.0 * tier)
+	glow.position.y = 4.0
+	add_child(glow)
+	if tier >= EnchantFx.Tier.RARE:
+		var epic: bool = tier == EnchantFx.Tier.EPIC
+		# El verde de los sets encandila mas que el dorado: un poco menos fuerte.
+		var strength: float = (0.7 if item_data.rarity == Itemdata.Rarity.SET else 1.0) if epic else 0.75
+		add_child(EnchantFx.beam(color, 900.0 if epic else 560.0, 120.0 if epic else 90.0, strength))
+
+
 func _setup_model_3d() -> void:
 	var model_root: Node3D = item_data.model_3d.instantiate()
 	model_holder.add_child(model_root)
@@ -121,8 +144,10 @@ func _setup_model_3d() -> void:
 	if max_dim > 0.0:
 		model_holder.scale = Vector3.ONE * (target_dim / max_dim)
 
-	var scaled_min: Vector3 = _bounds.position * model_holder.scale.x
-	model_root.position = Vector3(-center.x * model_holder.scale.x, -scaled_min.y, -center.z * model_holder.scale.x)
+	# La posicion va en el espacio del holder (que ya escala): sin multiplicar
+	# por la escala otra vez, o el modelo queda lejisimos (las armas de 0 A.D.
+	# no tienen el origen en el mango y quedaban flotando en el cielo).
+	model_root.position = Vector3(-center.x, -_bounds.position.y, -center.z)
 
 	fallback_mesh.visible = false
 	model_holder.visible = true
