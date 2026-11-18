@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://jv3gpk5y2jyk"
-path="res://.godot/imported/bandit_hood_hood_celt_dark.png-ff6c76bce20371309c23fe89af61160b.ctex"
+path.s3tc="res://.godot/imported/bandit_hood_hood_celt_dark.png-ff6c76bce20371309c23fe89af61160b.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "92138d35c37da95edf9ee64d75a15724"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/characters/oad/characters/bandit_hood_hood_celt_dark.png"
-dest_files=["res://.godot/imported/bandit_hood_hood_celt_dark.png-ff6c76bce20371309c23fe89af61160b.ctex"]
+dest_files=["res://.godot/imported/bandit_hood_hood_celt_dark.png-ff6c76bce20371309c23fe89af61160b.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

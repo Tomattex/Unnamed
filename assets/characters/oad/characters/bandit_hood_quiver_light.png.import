@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ecsuu61mskx8"
-path="res://.godot/imported/bandit_hood_quiver_light.png-8c50a5c6a5257a02ebba2d7a51470f16.ctex"
+path.s3tc="res://.godot/imported/bandit_hood_quiver_light.png-8c50a5c6a5257a02ebba2d7a51470f16.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d5c7d97007fc24477a77d7e61d627fdc"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/characters/oad/characters/bandit_hood_quiver_light.png"
-dest_files=["res://.godot/imported/bandit_hood_quiver_light.png-8c50a5c6a5257a02ebba2d7a51470f16.ctex"]
+dest_files=["res://.godot/imported/bandit_hood_quiver_light.png-8c50a5c6a5257a02ebba2d7a51470f16.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
