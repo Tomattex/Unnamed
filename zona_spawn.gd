@@ -7,12 +7,39 @@ extends Node3D
 ## Ademas de los tipos de la escena, cada zona suma los de EXTRA_TYPES segun
 ## su nombre (algunos solo de noche), su fauna (con cupo aparte) y, con los
 ## bandidos, grupos que patrullan los caminos o esperan escondidos al costado.
+## Para que no haya que caminar mucho hasta la proxima pelea: la mayoria de
+## los grupos sale adelante de por donde va el jugador, algunos vienen
+## caminando hacia el, con poca gente cerca las tandas salen enseguida, y
+## entre regiones (afuera de toda caja) se encarga la zona mas cercana, con
+## menos enemigos. En la aldea no sale nada.
 
 ## Distancia al jugador a la que aparecen los grupos (afuera de la pantalla).
-const SPAWN_MIN_DISTANCE := 1900.0
-const SPAWN_MAX_DISTANCE := 3000.0
+const SPAWN_MIN_DISTANCE := 1600.0
+const SPAWN_MAX_DISTANCE := 2900.0
 ## Intentos por tanda para encontrar un lugar valido.
-const SPAWN_TRIES := 10
+const SPAWN_TRIES := 14
+## Cuantos mas enemigos que max_enemies puede haber cerca (todas las zonas).
+const DENSITY := 1.25
+## Con menos de esta parte del cupo alrededor, la proxima tanda sale a los
+## REFILL_INTERVAL segundos en vez de esperar spawn_interval.
+const REFILL_FRACTION := 0.5
+const REFILL_INTERVAL := 0.8
+## Si el jugador camina, esta parte de los grupos sale adelante suyo (hasta
+## AHEAD_ANGLE radianes para cada lado de hacia donde va).
+const AHEAD_CHANCE := 0.75
+const AHEAD_ANGLE := 0.95
+## Parte de los grupos que sale caminando hacia donde va a estar el jugador
+## (ROAM_AHEAD mas adelante de donde esta).
+const ROAMER_CHANCE := 0.45
+const ROAM_AHEAD := 900.0
+const ROAM_SPREAD := 350.0
+## Afuera de toda zona, la mas cercana se encarga hasta esta distancia de su
+## caja, con esta parte de su cupo.
+const WILD_RANGE := 9000.0
+const WILD_DENSITY := 0.6
+## La aldea (la muralla mas este margen) no tiene enemigos.
+const VILLAGE_MARGIN := 700.0
+const World := preload("res://world/build_world.gd")
 ## Separacion entre los integrantes de un grupo.
 const PACK_SPREAD := 170.0
 ## Un punto vale si el piso caminable mas cercano esta a menos de esto.
@@ -136,20 +163,22 @@ func _spawn_enemy():
 	# De noche aparecen mas enemigos, mas seguido y un nivel mas fuertes.
 	var night: bool = world_time.is_night()
 	timer.wait_time = spawn_interval * (0.6 if night else 1.0)
-	var limit: int = roundi(max_enemies * (1.5 if night else 1.0))
-	if not _player_in_zone():
+	if not _in_charge():
 		return
+	var limit: int = _limit(night)
 	var nearby: int = _enemies_near_player()
+	if nearby < limit * REFILL_FRACTION:
+		timer.wait_time = REFILL_INTERVAL
 	if nearby >= limit:
 		return
 
 	var data: EnemyData = _pick(enemy_types, _night_weights if night else _day_weights)
 	if data == null:
 		return
-	var with_champion: bool = randf() < CHAMPION_CHANCE * (2.0 if night else 1.0)
-	var members: Array[EnemyData] = _group_for(data, with_champion)
-	members.resize(mini(members.size(), limit - nearby))
 	if data.roads:
+		var with_champion: bool = randf() < CHAMPION_CHANCE * (2.0 if night else 1.0)
+		var members: Array[EnemyData] = _group_for(data, with_champion)
+		members.resize(mini(members.size(), limit - nearby))
 		var roll: float = randf()
 		if roll < AMBUSH_CHANCE and _spawn_ambush(members, night, with_champion):
 			return
@@ -158,7 +187,29 @@ func _spawn_enemy():
 	var spot = _find_spot()
 	if spot == null:
 		return
-	_spawn_group(members, spot, night, with_champion)
+	# El lugar puede caer en la zona de al lado: el grupo es de esa.
+	var home_zone: Node = zone_for(get_tree(), spot)
+	if home_zone:
+		home_zone._spawn_pack(spot, limit - nearby, night, _roam_target())
+
+## Un grupo de esta zona en spot (hasta room integrantes). Con roam_target,
+## a veces sale caminando hacia ahi (y vuelve, si no encontro a nadie).
+func _spawn_pack(spot: Vector3, room: int, night: bool, roam_target) -> void:
+	var data: EnemyData = _pick(enemy_types, _night_weights if night else _day_weights)
+	if data == null:
+		return
+	var with_champion: bool = randf() < CHAMPION_CHANCE * (2.0 if night else 1.0)
+	var members: Array[EnemyData] = _group_for(data, with_champion)
+	members.resize(mini(members.size(), room))
+	var setup := Callable()
+	if roam_target != null and randf() < ROAMER_CHANCE:
+		var route := PackedVector3Array([spot, roam_target])
+		setup = func(enemy: Node) -> void:
+			enemy.patrol = route
+			enemy.patrol_offset = Vector3(randf_range(-130.0, 130.0), 0.0, randf_range(-130.0, 130.0))
+			enemy._patrol_index = 1
+			enemy._patrol_step = 1
+	_spawn_group(members, spot, night, with_champion, setup)
 
 # Quienes forman el grupo: los que tienen escolta (lider, chaman, nigromante)
 # vienen con sus compañeros; el resto, en manada de su tamaño.
@@ -213,28 +264,77 @@ func _enemies_near_player() -> int:
 				count += 1
 	return count
 
-func _player_in_zone() -> bool:
+## Si esta zona es la que se encarga del jugador (ver zone_for).
+func _in_charge() -> bool:
 	if not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 		if _player == null:
 			return false
-	# Lejos de la zona no se hace nada.
-	return _contains(_player.global_position, SPAWN_MAX_DISTANCE)
+	return zone_for(get_tree(), _player.global_position) == self
 
-## Un punto alrededor del jugador, dentro de la zona, sobre piso caminable y
-## que la camara no este viendo. null si no encontro ninguno.
-func _find_spot():
+## Cuantos enemigos puede haber cerca del jugador: menos entre regiones.
+func _limit(night: bool) -> int:
+	var limit: float = max_enemies * DENSITY * (1.5 if night else 1.0)
+	if not _contains(_player.global_position, 0.0):
+		limit *= WILD_DENSITY
+	return maxi(roundi(limit), 2)
+
+## La zona que se encarga de un punto: la que lo tiene adentro o, entre
+## regiones, la mas cercana (hasta WILD_RANGE de su caja). En la aldea, ninguna.
+static func zone_for(tree: SceneTree, point: Vector3) -> Node:
+	if in_village(point):
+		return null
+	var best: Node = null
+	var best_distance: float = WILD_RANGE
+	for zone in tree.get_nodes_in_group("enemy_zones"):
+		var distance: float = zone.distance_to_box(point)
+		if distance <= 0.0:
+			return zone
+		if distance < best_distance:
+			best = zone
+			best_distance = distance
+	return best
+
+static func in_village(point: Vector3) -> bool:
+	var half: float = World.WALL_HALF + VILLAGE_MARGIN
+	return absf(point.x - World.VILLAGE.x) < half and absf(point.z - World.VILLAGE.y) < half
+
+## Distancia en el plano de point a la caja de la zona (0 adentro).
+func distance_to_box(point: Vector3) -> float:
+	var local: Vector3 = zone_shape.global_transform.affine_inverse() * point
+	var half: Vector3 = zone_shape.shape.size / 2.0
+	return Vector2(maxf(absf(local.x) - half.x, 0.0), maxf(absf(local.z) - half.z, 0.0)).length()
+
+## Un punto alrededor del jugador, sobre piso caminable, fuera de la aldea y
+## que la camara no este viendo; si camina, casi siempre adelante suyo. Con
+## own_only, solo los que le tocan a esta zona. null si no encontro ninguno.
+func _find_spot(own_only: bool = false):
+	var heading: Vector3 = _heading()
 	for i in SPAWN_TRIES:
 		var angle: float = randf() * TAU
+		if heading != Vector3.ZERO and randf() < AHEAD_CHANCE:
+			angle = atan2(heading.z, heading.x) + randf_range(-AHEAD_ANGLE, AHEAD_ANGLE)
 		var distance: float = randf_range(SPAWN_MIN_DISTANCE, SPAWN_MAX_DISTANCE)
 		var candidate: Vector3 = _player.global_position + Vector3(cos(angle), 0.0, sin(angle)) * distance
-		if not _contains(candidate, 0.0):
+		var home_zone: Node = zone_for(get_tree(), candidate)
+		if home_zone == null or (own_only and home_zone != self):
 			continue
 		var point = _on_navmesh(candidate)
 		if point == null or _on_camera(point):
 			continue
 		return point
 	return null
+
+## Hacia donde camina el jugador (en el plano, normalizado), o cero si esta quieto.
+func _heading() -> Vector3:
+	var velocity: Vector3 = _player.velocity if "velocity" in _player else Vector3.ZERO
+	velocity.y = 0.0
+	return velocity.normalized() if velocity.length() > 80.0 else Vector3.ZERO
+
+## Un punto un poco adelante de donde va el jugador, sobre piso caminable.
+func _roam_target():
+	var spread := Vector3(randf_range(-ROAM_SPREAD, ROAM_SPREAD), 0.0, randf_range(-ROAM_SPREAD, ROAM_SPREAD))
+	return _on_navmesh(_player.global_position + _heading() * ROAM_AHEAD + spread)
 
 func _on_camera(point: Vector3) -> bool:
 	var camera: Camera3D = get_viewport().get_camera_3d()
@@ -272,7 +372,7 @@ func _pick(types: Array[EnemyData], weights: Array[float]) -> EnemyData:
 # --- Fauna ---------------------------------------------------------------------
 
 func _spawn_fauna() -> void:
-	if not _player_in_zone():
+	if not _in_charge():
 		return
 	var animals := 0
 	for enemy in get_tree().get_nodes_in_group("prey"):
@@ -280,7 +380,7 @@ func _spawn_fauna() -> void:
 			animals += 1
 	if animals >= FAUNA_LIMIT:
 		return
-	var spot = _find_spot()
+	var spot = _find_spot(true)
 	if spot == null:
 		return
 	var data: EnemyData = _pick(_fauna_types, _fauna_weights)

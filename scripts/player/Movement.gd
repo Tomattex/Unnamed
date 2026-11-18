@@ -3,7 +3,8 @@ extends CharacterBody3D
 signal hovered_enemy_changed(enemy: Node3D)
 
 @export var ClickReference: NodePath = NodePath("../ClickReference")
-@onready var click_reference: Node3D = get_node_or_null(ClickReference)
+const ClickMarker := preload("res://scripts/player/click_marker.gd")
+@onready var click_reference: ClickMarker = get_node_or_null(ClickReference)
 @onready var nav_agent: NavigationAgent3D = $NavigationAgent3D
 @onready var combat: Node = $Combat
 @onready var mount: Node3D = $Mount
@@ -125,7 +126,7 @@ func _physics_process(delta: float) -> void:
 
 	if nav_agent.is_navigation_finished():
 		if click_reference:
-			click_reference.hide()
+			click_reference.arrive()
 		tiempo_paso = intervalo_pasos
 		_brake(delta)
 		return
@@ -309,7 +310,7 @@ func _handle_click() -> void:
 		target_enemy = null
 		pending_skill = -1
 		_holding_move = false
-		_move_to(target_pickup.global_position)
+		_move_to(target_pickup.global_position, ClickMarker.Kind.INTERACT)
 		return
 
 	var pointed: Node3D = _enemy_under_mouse()
@@ -322,7 +323,7 @@ func _handle_click() -> void:
 		_last_chase_target = Vector3.INF
 		_holding_move = false
 		if click_reference:
-			click_reference.hide()
+			click_reference.clear()
 		return
 
 	var thing: Node3D = _interactive_under_mouse()
@@ -338,7 +339,7 @@ func _handle_click() -> void:
 		pending_skill = -1
 		pending_combo = false
 		_holding_move = false
-		_move_to(target_npc.global_position)
+		_move_to(target_npc.global_position, ClickMarker.Kind.INTERACT)
 		return
 
 	var enemy: Node3D = _enemy_from_collider(thing) if thing else null
@@ -349,7 +350,7 @@ func _handle_click() -> void:
 		_last_chase_target = Vector3.INF
 		_holding_move = false
 		if click_reference:
-			click_reference.hide()
+			click_reference.clear()
 		return
 
 	target_enemy = null
@@ -371,7 +372,7 @@ func _update_hold(delta: float) -> void:
 	_hold_timer = 0.0
 	var ground: Vector3 = _ground_under_mouse()
 	if ground.is_finite() and _enemy_under_mouse() == null:
-		_move_to_ground(ground)
+		_move_to_ground(ground, false)
 
 
 ## Intenta usar la habilidad del slot (teclas 1-5 o clic en la barra).
@@ -455,10 +456,11 @@ func _skill_target() -> Node3D:
 	return best
 
 
-func _move_to(point: Vector3) -> void:
+## Camina hasta point y pone ahi la marca del clic (burst = clic nuevo: la
+## marca repite su entrada; mantener apretado solo la corre).
+func _move_to(point: Vector3, kind: int = ClickMarker.Kind.MOVE, burst: bool = true) -> void:
 	if click_reference:
-		click_reference.global_position = point
-		click_reference.show()
+		click_reference.mark(point, kind, burst)
 	nav_agent.target_position = point
 
 
@@ -467,8 +469,8 @@ func _move_to(point: Vector3) -> void:
 # pared ya transparente delante del jugador se quedaba con el clic y lo
 # mandaba contra ella). La marca va a donde de verdad termina el camino (ver
 # _on_path_changed).
-func _move_to_ground(point: Vector3) -> void:
-	_move_to(_walk_target(Vector3(point.x, 0.0, point.z)))
+func _move_to_ground(point: Vector3, burst: bool = true) -> void:
+	_move_to(_walk_target(Vector3(point.x, 0.0, point.z)), ClickMarker.Kind.MOVE, burst)
 
 
 ## Punto del piso (y = 0) bajo el mouse; INF si el mouse apunta al cielo.
@@ -530,7 +532,7 @@ func _on_path_changed() -> void:
 		# todavia no sincronizo).
 		var path: PackedVector3Array = nav_agent.get_current_navigation_path()
 		if not path.is_empty():
-			click_reference.global_position = path[path.size() - 1]
+			click_reference.follow(path[path.size() - 1])
 
 
 func _update_hover() -> void:
