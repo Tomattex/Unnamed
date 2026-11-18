@@ -70,15 +70,16 @@ const DEAD_TREES := [O + "muerto_a.glb", O + "muerto_b.glb", O + "roble_seco_b.g
 const WILLOWS := [O + "sauce_a.glb", O + "sauce_b.glb"]
 const BUSHES := [O + "arbusto_a.glb", O + "arbusto_b.glb", O + "arbusto_c.glb", O + "arbusto_d.glb"]
 const FERNS := [O + "helecho_a.glb", O + "helecho_b.glb"]
-## Escala (minima, maxima) de cada tipo: los arboles quedan de 2 a 3 veces el
-## alto del jugador (unas 900 a 1350 unidades). A tamaño real (7 a 10 m) la
-## camara, que anda a unas 700 de alto, quedaba metida adentro de las copas.
-const OAK_SCALE := Vector2(80.0, 100.0)
-const ELM_SCALE := Vector2(80.0, 95.0)
-const BIRCH_SCALE := Vector2(140.0, 170.0)
-const FIR_SCALE := Vector2(130.0, 160.0)
-const DEAD_SCALE := Vector2(85.0, 110.0)
-const WILLOW_SCALE := Vector2(110.0, 130.0)
+## Escala (minima, maxima) de cada tipo: los arboles quedan de 1,5 a 2,3
+## veces el alto del jugador (unas 630 a 950 unidades), por debajo de la
+## camara (a unas 1000 de alto). A tamaño real (7 a 10 m), o aun a 2-3 veces
+## el jugador, las copas cercanas llenaban la pantalla y tapaban la pelea.
+const OAK_SCALE := Vector2(56.0, 70.0)
+const ELM_SCALE := Vector2(56.0, 66.0)
+const BIRCH_SCALE := Vector2(98.0, 119.0)
+const FIR_SCALE := Vector2(91.0, 112.0)
+const DEAD_SCALE := Vector2(60.0, 77.0)
+const WILLOW_SCALE := Vector2(77.0, 91.0)
 const BUSH_SCALE := Vector2(100.0, 150.0)
 const FERN_SCALE := Vector2(130.0, 190.0)
 ## Lugar libre alrededor de cofres y santuarios (el botin y el sigilo).
@@ -2204,7 +2205,7 @@ func _beach(coast: Node3D) -> void:
 		if _rng.randf() < 0.45:
 			_prop(coast, BOULDERS[_rng.randi() % 2], Vector3(x, 0, z), _rng.randf() * TAU, _rng.randf_range(700.0, 1300.0), 0.4, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.85, 0.82, 0.78)})
 		else:
-			_prop(coast, _any(DEAD_TREES), Vector3(x, -40, z), _rng.randf() * TAU, _rng.randf_range(80.0, 110.0), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.76, 0.68)}, false, TRUNK_RADIUS)
+			_prop(coast, _any(DEAD_TREES), Vector3(x, -40, z), _rng.randf() * TAU, _rng.randf_range(DEAD_SCALE.x, DEAD_SCALE.y), 0.0, {"style": PROP_SCRIPT.Style.TINT, "tint": Color(0.82, 0.76, 0.68)}, false, TRUNK_RADIUS)
 		_strict = false
 		_rejected = false
 
