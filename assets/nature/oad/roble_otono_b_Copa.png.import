@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dmoyc3qjl3yhy"
-path="res://.godot/imported/roble_otono_b_Copa.png-c6e21ec5319356dff91bbf09fe1bd4a3.ctex"
+path.s3tc="res://.godot/imported/roble_otono_b_Copa.png-c6e21ec5319356dff91bbf09fe1bd4a3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d17b213460c8abb5ed35e7ce288a7e21"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/nature/oad/roble_otono_b_Copa.png"
-dest_files=["res://.godot/imported/roble_otono_b_Copa.png-c6e21ec5319356dff91bbf09fe1bd4a3.ctex"]
+dest_files=["res://.godot/imported/roble_otono_b_Copa.png-c6e21ec5319356dff91bbf09fe1bd4a3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

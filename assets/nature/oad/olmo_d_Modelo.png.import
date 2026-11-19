@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cpyu1dca5mxbw"
-path="res://.godot/imported/olmo_d_Modelo.png-ee0b36bcecea7e11a40495b651845f91.ctex"
+path.s3tc="res://.godot/imported/olmo_d_Modelo.png-ee0b36bcecea7e11a40495b651845f91.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "806625505f94e289b9c6615969ea4b6c"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/nature/oad/olmo_d_Modelo.png"
-dest_files=["res://.godot/imported/olmo_d_Modelo.png-ee0b36bcecea7e11a40495b651845f91.ctex"]
+dest_files=["res://.godot/imported/olmo_d_Modelo.png-ee0b36bcecea7e11a40495b651845f91.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

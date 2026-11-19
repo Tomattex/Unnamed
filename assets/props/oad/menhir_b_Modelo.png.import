@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ci7ab1q2l6nie"
-path="res://.godot/imported/menhir_b_Modelo.png-7daa2ee4398250c1543172fd0f54d9bb.ctex"
+path.s3tc="res://.godot/imported/menhir_b_Modelo.png-7daa2ee4398250c1543172fd0f54d9bb.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "1812bb09aec852807ea40394c507101c"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/props/oad/menhir_b_Modelo.png"
-dest_files=["res://.godot/imported/menhir_b_Modelo.png-7daa2ee4398250c1543172fd0f54d9bb.ctex"]
+dest_files=["res://.godot/imported/menhir_b_Modelo.png-7daa2ee4398250c1543172fd0f54d9bb.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

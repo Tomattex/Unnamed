@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://m4snnyqcm5wa"
-path="res://.godot/imported/helecho_b_Modelo.png-4da50ff73386cbcb67e2ffd23ae9724f.ctex"
+path.s3tc="res://.godot/imported/helecho_b_Modelo.png-4da50ff73386cbcb67e2ffd23ae9724f.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "b12df0ebb2123fdc579cfa322395b4b1"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/nature/oad/helecho_b_Modelo.png"
-dest_files=["res://.godot/imported/helecho_b_Modelo.png-4da50ff73386cbcb67e2ffd23ae9724f.ctex"]
+dest_files=["res://.godot/imported/helecho_b_Modelo.png-4da50ff73386cbcb67e2ffd23ae9724f.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Unnamed"
+config/name="Sacred Palace"
 run/main_scene="uid://dyoo8hg8g28vh"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"

@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://sg8dnxot7gic"
-path="res://.godot/imported/esqueleto_b_Modelo.png-782ac6e9760d7f91a78d4f629d412a38.ctex"
+path.s3tc="res://.godot/imported/esqueleto_b_Modelo.png-782ac6e9760d7f91a78d4f629d412a38.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "e8183adc2129d3add1ba5b15a27f6aba"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/props/oad/esqueleto_b_Modelo.png"
-dest_files=["res://.godot/imported/esqueleto_b_Modelo.png-782ac6e9760d7f91a78d4f629d412a38.ctex"]
+dest_files=["res://.godot/imported/esqueleto_b_Modelo.png-782ac6e9760d7f91a78d4f629d412a38.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
