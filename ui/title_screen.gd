@@ -128,13 +128,6 @@ func _build() -> void:
 	title.add_theme_constant_override("shadow_outline_size", 8)
 	column.add_child(title)
 
-	var tagline := Label.new()
-	tagline.text = "Un ARPG de código libre"
-	tagline.add_theme_font_override("font", _item_font)
-	tagline.add_theme_font_size_override("font_size", 15)
-	tagline.add_theme_color_override("font_color", DIM)
-	column.add_child(tagline)
-
 	var rule := ColorRect.new()
 	rule.color = Color(GOLD, 0.45)
 	rule.custom_minimum_size = Vector2(300, 1)
@@ -157,18 +150,6 @@ func _build() -> void:
 	for page in _pages.values():
 		page.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 		_pages_root.add_child(page)
-
-	var hint := Label.new()
-	hint.text = "Mouse o flechas para elegir · Enter: aceptar · Esc: volver"
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color(DIM, 0.8))
-	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	hint.offset_left = 96
-	hint.offset_top = -48
-	hint.offset_bottom = -26
-	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_root.add_child(hint)
-
 
 func _build_main() -> VBoxContainer:
 	var page := _page()

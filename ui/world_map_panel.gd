@@ -24,7 +24,6 @@ const PICK_RADIUS: float = 18.0
 
 var _panel: PanelContainer
 var _title: Label
-var _hint: Label
 var _view: Control
 var _zoom: float = 3.0
 var _center: Vector2 = Vector2.ZERO
@@ -56,10 +55,6 @@ func _ready() -> void:
 	_panel.add_child(box)
 	var header := WindowStyle.header("", close, "Cerrar (Tab)")
 	_title = WindowStyle.title_of(header)
-	_hint = Label.new()
-	_hint.theme_type_variation = &"DimLabel"
-	_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	WindowStyle.add_to_header(header, _hint, true)
 	box.add_child(header)
 	box.add_child(WindowStyle.rule())
 
@@ -101,8 +96,6 @@ func _show() -> void:
 		_center = Vector2(player.global_position.x, player.global_position.z)
 	visible = true
 	_title.text = "Viajar por los portales" if not _travel_from.is_empty() else "Mapa del mundo"
-	_hint.text = ("Clic en un portal: viajar · " if not _travel_from.is_empty() else "") \
-			+ "Rueda: zoom · Arrastrar: mover · Clic derecho: centrar"
 	world_map.get_map_texture()
 	sfx.play("page")
 	_update_pause()

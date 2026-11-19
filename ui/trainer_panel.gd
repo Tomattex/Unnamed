@@ -129,7 +129,7 @@ func _refresh() -> void:
 		detail.add_theme_font_size_override("font_size", 14)
 		detail.add_theme_color_override("font_color", TEXT if level > 0 else DIM)
 		detail.text = "Nivel %d: %s" % [level + 1, Passives.describe(id, level + 1)] if level > 0 \
-				else "No la sabés: elegila en Pasivas (P) cuando tengas un lugar libre"
+				else "No la tenés aún."
 		texts.add_child(detail)
 		row.add_child(texts)
 		if level > 0:

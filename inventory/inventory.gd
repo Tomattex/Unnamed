@@ -15,8 +15,6 @@ const SkillsView := preload("res://inventory/skills_view.gd")
 const ItemDrag := preload("res://inventory/item_drag.gd")
 const WindowStyle := preload("res://ui/window_style.gd")
 ## Ayuda del pie (donde salen tambien los avisos, que la tapan un rato).
-const BAG_HELP := "Arrastrar o clic: mover · Clic der.: usar · Soltar afuera: tirar · W E R T: cinturón"
-const SKILLS_HELP := "La habilidad 1 va en la tecla 1, la 2 en la 2... · Runas: clic der. en la mochila"
 const PENDING_COLOR := Color(0.55, 0.9, 0.45)
 const HELP_COLOR := Color(0.6, 0.55, 0.46)
 const CELL: int = InventoryGrid.CELL
@@ -49,7 +47,6 @@ var _bag: VBoxContainer
 var _skills: Control
 var _tab_buttons: Array[Button] = []
 var _sort_button: Button
-var _help_text: String = BAG_HELP
 var _message: Label
 var _overflow_label: Label
 var _gold_label: Label
@@ -153,7 +150,6 @@ func _build() -> void:
 	_message.custom_minimum_size.x = CELL * inventory_data.GRID_SIZE.x - 140
 	_message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	footer.add_child(_message)
-	_show_help()
 	var coin := TextureRect.new()
 	coin.texture = preload("res://item/items/gold.tres").texture
 	coin.custom_minimum_size = Vector2(24, 24)
@@ -199,9 +195,6 @@ func show_tab(index: int) -> void:
 	_bag.visible = index == 0
 	_skills.visible = index == 1
 	_sort_button.visible = index == 0
-	_help_text = BAG_HELP if index == 0 else SKILLS_HELP
-	if _message_timer <= 0.0:
-		_show_help()
 	_tab_buttons[index].set_pressed_no_signal(true)
 
 
@@ -250,8 +243,6 @@ func _build_hero_view() -> Control:
 func _process(delta: float) -> void:
 	if _message_timer > 0.0:
 		_message_timer -= delta
-		if _message_timer <= 0.0:
-			_show_help()
 	if _held_view.visible:
 		_held_view.global_position = get_global_mouse_position() - _held_view.size / 2.0
 	if visible:
@@ -322,13 +313,6 @@ func _show_message(message: String, color: Color = Color(0.95, 0.3, 0.25)) -> vo
 	_message.add_theme_color_override("font_color", color)
 	_message.add_theme_font_size_override("font_size", 14)
 	_message_timer = 2.5
-
-
-func _show_help() -> void:
-	_message.text = _help_text
-	_message.add_theme_color_override("font_color", HELP_COLOR)
-	_message.add_theme_font_size_override("font_size", 12)
-
 
 func _on_sort_pressed() -> void:
 	inventory_data.return_held()

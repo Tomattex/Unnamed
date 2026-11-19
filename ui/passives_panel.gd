@@ -52,13 +52,6 @@ func _ready() -> void:
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_message)
 
-	var footer := Label.new()
-	footer.text = "Cada nivel da un punto para subir una pasiva. El Maestro de armas y el Sabio de la aldea también las entrenan, por oro."
-	footer.theme_type_variation = &"DimLabel"
-	footer.add_theme_font_size_override("font_size", 12)
-	footer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(footer)
-
 	player_stats.passives_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			refresh())

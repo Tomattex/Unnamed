@@ -1,8 +1,8 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://bhpmqbnd3u85w"]
 
-[ext_resource type="Script" path="res://ui/character_screen.gd" id="1_char"]
+[ext_resource type="Script" uid="uid://d0jbj3fyvhdyw" path="res://ui/character_screen.gd" id="1_char"]
 
-[node name="CharacterScreen" type="PanelContainer"]
+[node name="CharacterScreen" type="PanelContainer" unique_id=1561758245]
 visible = false
 anchors_preset = 4
 anchor_top = 0.5
@@ -14,24 +14,24 @@ offset_bottom = 250.0
 grow_vertical = 2
 script = ExtResource("1_char")
 
-[node name="VBox" type="VBoxContainer" parent="."]
+[node name="VBox" type="VBoxContainer" parent="." unique_id=446596142]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="LevelLabel" type="Label" parent="VBox"]
+[node name="LevelLabel" type="Label" parent="VBox" unique_id=1139639429]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Nivel 1"
 
-[node name="XPBar" type="ProgressBar" parent="VBox"]
+[node name="XPBar" type="ProgressBar" parent="VBox" unique_id=1490647405]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 theme_type_variation = &"XPBar"
 show_percentage = false
 
-[node name="XPLabel" type="Label" parent="VBox/XPBar"]
+[node name="XPLabel" type="Label" parent="VBox/XPBar" unique_id=41039755]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -45,43 +45,43 @@ text = "0 / 80 exp"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Separator1" type="HSeparator" parent="VBox"]
+[node name="Separator1" type="HSeparator" parent="VBox" unique_id=1021669453]
 layout_mode = 2
 
-[node name="AttributeHeader" type="HBoxContainer" parent="VBox"]
+[node name="AttributeHeader" type="HBoxContainer" parent="VBox" unique_id=500979187]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="VBox/AttributeHeader"]
+[node name="Label" type="Label" parent="VBox/AttributeHeader" unique_id=1835102066]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 theme_override_font_sizes/font_size = 16
 text = "Atributos"
 
-[node name="Spacer" type="Control" parent="VBox/AttributeHeader"]
+[node name="Spacer" type="Control" parent="VBox/AttributeHeader" unique_id=1650926056]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PointsLabel" type="Label" parent="VBox/AttributeHeader"]
+[node name="PointsLabel" type="Label" parent="VBox/AttributeHeader" unique_id=469851195]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.9, 0.45, 1)
 text = "Puntos: 0"
 
-[node name="AttributeList" type="VBoxContainer" parent="VBox"]
+[node name="AttributeList" type="VBoxContainer" parent="VBox" unique_id=519292553]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Separator2" type="HSeparator" parent="VBox"]
+[node name="Separator2" type="HSeparator" parent="VBox" unique_id=1016381631]
 layout_mode = 2
 
-[node name="DerivedHeader" type="Label" parent="VBox"]
+[node name="DerivedHeader" type="Label" parent="VBox" unique_id=322443092]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 theme_override_font_sizes/font_size = 16
 text = "Combate"
 
-[node name="DerivedGrid" type="GridContainer" parent="VBox"]
+[node name="DerivedGrid" type="GridContainer" parent="VBox" unique_id=1479579046]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 12

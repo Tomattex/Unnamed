@@ -33,14 +33,6 @@ func _ready() -> void:
 	grid.grid = inventory_data.stash
 	box.add_child(grid)
 
-	var help := Label.new()
-	help.text = "Agarrá y soltá entre el baúl y el inventario · Clic derecho: pasar al otro lado"
-	help.theme_type_variation = &"DimLabel"
-	help.add_theme_font_size_override("font_size", 12)
-	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.custom_minimum_size.x = grid.custom_minimum_size.x
-	box.add_child(help)
-
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 16)
 	grow_vertical = Control.GROW_DIRECTION_BOTH
 	_connect_stashes.call_deferred()

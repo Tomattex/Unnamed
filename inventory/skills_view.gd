@@ -20,12 +20,6 @@ var _dirty: bool = true
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
-	var intro := Label.new()
-	intro.text = "Cada habilidad se aprende sola al llegar a su nivel, o antes leyendo su runa. Las runas también las suben de nivel (hasta tu nivel). La habilidad N va en la tecla N de la barra."
-	intro.theme_type_variation = &"DimLabel"
-	intro.add_theme_font_size_override("font_size", 13)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	add_child(intro)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

@@ -45,7 +45,7 @@ func _ready() -> void:
 	box.add_child(WindowStyle.rule())
 
 	var info := Label.new()
-	info.text = "Las runas de otras clases no te sirven, pero a mí sí: te las cambio por una de las tuyas."
+	info.text = "Las runas de otras clases no te sirven, pero a mí sí. Te las cambio por una de las tuyas."
 	info.theme_type_variation = &"DimLabel"
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(info)
@@ -190,7 +190,7 @@ func _on_trade() -> void:
 	sfx.play("coins" if problem.is_empty() else "stuck")
 	if problem.is_empty():
 		_message.add_theme_color_override("font_color", Color(0.55, 0.85, 0.5))
-		_message.text = "Listo: ahora tenés la runa de %s" % skill_book.get_skill(_want_index).name
+		_message.text = "Listo, ahora tenés la runa de %s" % skill_book.get_skill(_want_index).name
 	else:
 		_message.add_theme_color_override("font_color", Color(0.95, 0.35, 0.3))
 	_refresh()

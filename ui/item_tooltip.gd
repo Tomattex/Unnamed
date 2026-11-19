@@ -96,7 +96,7 @@ static func _add_rune_info(box: VBoxContainer, item: Itemdata) -> void:
 	_add_separator(box)
 	var index: int = skill_book.rune_index(item)
 	if index < 0:
-		var other: Label = _add(box, "Es de otra clase: cambiala en el comerciante de runas de la aldea.", MISSING_COLOR, 13)
+		var other: Label = _add(box, "Es de otra clase.", MISSING_COLOR, 13)
 		other.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		return
 	var skill: SkillData = skill_book.get_skill(index)

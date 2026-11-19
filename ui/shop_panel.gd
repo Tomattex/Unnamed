@@ -34,11 +34,6 @@ func _ready() -> void:
 	box.add_child(WindowStyle.header("Comerciante", close))
 	box.add_child(WindowStyle.rule())
 
-	var info := Label.new()
-	info.text = "Clic en un item para comprarlo.\nClic derecho en tu inventario para vender."
-	info.theme_type_variation = &"DimLabel"
-	box.add_child(info)
-
 	_grid = GridContainer.new()
 	_grid.columns = 4
 	_grid.add_theme_constant_override("h_separation", 8)

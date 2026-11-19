@@ -157,22 +157,6 @@ func _build_main() -> VBoxContainer:
 		save_game.save()
 		get_tree().quit())
 
-	box.add_child(_rule())
-	var keys := Label.new()
-	keys.text = "I inventario · C personaje y pasivas · B bestiario · Tab mapa · N mapa encima
-K combo · M montura · Q poción · W E R T cinturón · F juntar"
-	keys.theme_type_variation = &"DimLabel"
-	keys.add_theme_font_size_override("font_size", 12)
-	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(keys)
-
-	# Atribucion que piden las licencias CC-BY (detalle en el menu principal y CREDITS.md).
-	var credits := Label.new()
-	credits.text = "Interfaz: Matjaž Lamut (CC-BY 3.0) · Íconos: game-icons.net (CC BY 3.0)"
-	credits.theme_type_variation = &"DimLabel"
-	credits.add_theme_font_size_override("font_size", 11)
-	credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(credits)
 	return box
 
 

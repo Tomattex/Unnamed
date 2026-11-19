@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c8uefw44ymmhj"
-path="res://.godot/imported/ciervo_animal_deer_02.png-04fa1cf2f3617b3e5e4139df0dad8885.ctex"
+path.s3tc="res://.godot/imported/ciervo_animal_deer_02.png-04fa1cf2f3617b3e5e4139df0dad8885.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "384cf643359581b2f649620934d75e9e"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/animals/oad/ciervo_animal_deer_02.png"
-dest_files=["res://.godot/imported/ciervo_animal_deer_02.png-04fa1cf2f3617b3e5e4139df0dad8885.ctex"]
+dest_files=["res://.godot/imported/ciervo_animal_deer_02.png-04fa1cf2f3617b3e5e4139df0dad8885.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
